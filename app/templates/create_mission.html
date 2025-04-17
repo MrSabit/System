@@ -1,0 +1,360 @@
+{% extends 'base.html' %}
+
+{% block title %}Create New Mission - The Journey{% endblock %}
+
+{% block content %}
+<style>
+    /* Dark theme with red accents for missions */
+    .create-mission-container {
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .create-mission-header {
+        margin-bottom: 25px;
+        position: relative;
+    }
+    
+    .create-mission-title {
+        font-size: 2.2rem;
+        position: relative;
+        display: inline-block;
+        color: #f8f8f8;
+        text-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+        margin-right: 20px;
+        font-weight: bold;
+    }
+    
+    .create-mission-title::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, #dc2626, transparent);
+        border-radius: 2px;
+    }
+    
+    .create-mission-description {
+        font-size: 1.1rem;
+        color: #94a3b8;
+        margin: 20px 0 30px;
+        line-height: 1.5;
+    }
+    
+    .mission-form {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(17, 24, 39, 0.95));
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        border-left: 5px solid #dc2626;
+    }
+    
+    .form-group {
+        margin-bottom: 25px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+        color: #e2e8f0;
+        font-weight: 600;
+    }
+    
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px 15px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #f8fafc;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #dc2626;
+        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+        background: rgba(15, 23, 42, 0.8);
+    }
+    
+    .form-group textarea {
+        min-height: 150px;
+        resize: vertical;
+    }
+    
+    .form-group .helper-text {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        margin-top: 8px;
+    }
+    
+    .mission-form-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 30px;
+    }
+    
+    .mission-submit-btn {
+        background: linear-gradient(135deg, #dc2626, #991b1b);
+        color: white;
+        padding: 12px 30px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .mission-submit-btn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(220, 38, 38, 0.6);
+    }
+    
+    .mission-submit-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: all 0.5s ease;
+    }
+    
+    .mission-submit-btn:hover::before {
+        left: 100%;
+    }
+    
+    .cancel-btn {
+        background: transparent;
+        color: #94a3b8;
+        padding: 12px 24px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .cancel-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #cbd5e1;
+    }
+    
+    .reward-indicator {
+        background: rgba(0, 0, 0, 0.3);
+        border-left: 3px solid #fde047;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    
+    .reward-indicator h3 {
+        font-size: 1.1rem;
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #fde047;
+    }
+    
+    .reward-indicator p {
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.5;
+    }
+    
+    @media (max-width: 768px) {
+        .mission-form-actions {
+            flex-direction: column-reverse;
+            gap: 15px;
+        }
+        
+        .mission-submit-btn, .cancel-btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+    
+    /* Loading indicator */
+    .loading-indicator {
+        display: none;
+        margin-right: 10px;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+        vertical-align: middle;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+<div class="create-mission-container">
+    <div class="create-mission-header">
+        <div class="create-mission-title">Create Mission</div>
+    </div>
+    
+    <div class="create-mission-description">
+        Define a significant challenge or milestone that will shape your journey. Missions represent your most ambitious goals and reward you with 500 XP upon completion.
+    </div>
+    
+    <div class="reward-indicator">
+        <h3>REWARD: 500 XP</h3>
+        <p>Missions are high-value achievements that provide substantial progress toward your next level. Make them challenging but achievable.</p>
+    </div>
+    
+    <form class="mission-form" id="create-mission-form">
+        <div class="form-group">
+            <label for="title">Mission Title</label>
+            <input type="text" id="title" name="title" required placeholder="Enter a compelling title for your mission">
+            <div class="helper-text">Make it meaningful and inspiring. Example: "Master Advanced JavaScript Concepts"</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Mission Description</label>
+            <textarea id="description" name="description" placeholder="Describe what this mission entails and why it's important to your journey"></textarea>
+            <div class="helper-text">Provide details on what you want to accomplish and why it matters</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="requirements">Completion Requirements</label>
+            <textarea id="requirements" name="requirements" placeholder="List specific criteria that must be met to consider this mission complete"></textarea>
+            <div class="helper-text">Be specific about what constitutes success. Example: "Complete 5 real-world projects using advanced concepts"</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="estimated_duration">Estimated Duration</label>
+            <input type="text" id="estimated_duration" name="estimated_duration" placeholder="Example: 2 weeks, 1 month">
+            <div class="helper-text">A realistic timeframe helps you track progress and stay motivated</div>
+        </div>
+        
+        <div class="mission-form-actions">
+            <a href="{{ url_for('journey.missions') }}" class="cancel-btn">Cancel</a>
+            <button type="submit" class="mission-submit-btn">
+                <span class="loading-indicator" id="submit-loader"></span>
+                <span class="button-text">Create Mission</span>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Flag to prevent duplicate form submissions and notifications
+    const missionFormInitialized = window.missionFormInitialized || false;
+    let isSubmitting = false;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prevent duplicate event handlers
+        if (missionFormInitialized) {
+            console.log("Mission form handlers already initialized, skipping...");
+            return;
+        }
+        window.missionFormInitialized = true;
+        
+        const form = document.getElementById('create-mission-form');
+        const submitButton = form.querySelector('.mission-submit-btn');
+        const buttonText = submitButton.querySelector('.button-text');
+        const loadingIndicator = document.getElementById('submit-loader');
+        
+        // Store the original form action
+        const formAction = "{{ url_for('journey.create_mission') }}";
+        
+        // Add submission handler to prevent multiple submissions
+        form.addEventListener('submit', function(e) {
+            // Prevent default form submission
+            e.preventDefault();
+            
+            // If already submitting, ignore additional clicks
+            if (isSubmitting) {
+                return false;
+            }
+            
+            // Get form data
+            const title = form.querySelector('#title').value.trim();
+            if (!title) {
+                if (window.journeyNotification) {
+                    window.journeyNotification.notify({
+                        title: 'Validation Error',
+                        message: 'Mission title is required',
+                        type: 'error'
+                    });
+                }
+                return false;
+            }
+            
+            // Set submitting state
+            isSubmitting = true;
+            
+            // Update button appearance
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.7';
+            submitButton.style.transform = 'none';
+            submitButton.style.boxShadow = 'none';
+            buttonText.innerText = 'Creating...';
+            loadingIndicator.style.display = 'inline-block';
+            
+            // Collect form data
+            const formData = new FormData(form);
+            
+            // Send AJAX request
+            fetch(formAction, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                // Redirect to missions page
+                window.location.href = "{{ url_for('journey.missions') }}";
+            })
+            .catch(error => {
+                console.error('Error submitting mission:', error);
+                
+                // Reset submission state
+                isSubmitting = false;
+                submitButton.disabled = false;
+                submitButton.style.opacity = '';
+                submitButton.style.transform = '';
+                submitButton.style.boxShadow = '';
+                buttonText.innerText = 'Create Mission';
+                loadingIndicator.style.display = 'none';
+                
+                // Show error notification
+                if (window.journeyNotification) {
+                    window.journeyNotification.notify({
+                        title: 'Error',
+                        message: 'Failed to create mission. Please try again.',
+                        type: 'error'
+                    });
+                }
+            });
+            
+            return false;
+        });
+    });
+</script>
+{% endblock %} 

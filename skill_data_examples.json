@@ -1,0 +1,175 @@
+{
+  "Physical & Strength Skills": [
+    {
+      "name": "Strength",
+      "description": "Ability to lift heavy objects, perform physically demanding tasks, and build muscular power.",
+      "icon": "💪",
+      "level": 1,
+      "progress": 20
+    },
+    {
+      "name": "Endurance",
+      "description": "Ability to sustain physical effort for long periods without getting tired.",
+      "icon": "🏃‍♂️",
+      "level": 1,
+      "progress": 15
+    },
+    {
+      "name": "Agility",
+      "description": "Ability to move quickly, change direction, and react fast with balance and control.",
+      "icon": "🤸‍♂️",
+      "level": 1,
+      "progress": 10
+    },
+    {
+      "name": "Flexibility",
+      "description": "Ability to stretch, bend, and move body parts through a full range of motion.",
+      "icon": "🧘‍♂️",
+      "level": 1,
+      "progress": 5
+    },
+    {
+      "name": "Stamina",
+      "description": "Ability to maintain energy and resist fatigue during prolonged activity.",
+      "icon": "🔥",
+      "level": 1,
+      "progress": 12
+    }
+  ],
+  "Mental & Cognitive Skills": [
+    {
+      "name": "Perception",
+      "description": "Sharpen your observation skills, situational awareness, and attention to detail.",
+      "icon": "👀",
+      "level": 1,
+      "progress": 25
+    },
+    {
+      "name": "Memory",
+      "description": "Improve ability to recall information, facts, and past experiences accurately.",
+      "icon": "🧠",
+      "level": 1,
+      "progress": 18
+    },
+    {
+      "name": "Problem-Solving",
+      "description": "Ability to analyze situations, think logically, and find effective solutions.",
+      "icon": "🧩",
+      "level": 1,
+      "progress": 10
+    },
+    {
+      "name": "Creativity",
+      "description": "Ability to generate innovative ideas, think outside the box, and create new things.",
+      "icon": "🎨",
+      "level": 1,
+      "progress": 8
+    }
+  ],
+  "Communication & Social Skills": [
+    {
+      "name": "Conversation",
+      "description": "Develop fluency, clarity, and confidence in speaking with others.",
+      "icon": "🗣️",
+      "level": 1,
+      "progress": 30
+    },
+    {
+      "name": "Persuasion",
+      "description": "Ability to influence, negotiate, and convince people effectively.",
+      "icon": "🤝",
+      "level": 1,
+      "progress": 12
+    },
+    {
+      "name": "Listening",
+      "description": "Become better at active listening, understanding others, and responding thoughtfully.",
+      "icon": "👂",
+      "level": 1,
+      "progress": 22
+    },
+    {
+      "name": "Charisma",
+      "description": "Work on body language, storytelling, and projecting a confident presence.",
+      "icon": "✨",
+      "level": 1,
+      "progress": 14
+    }
+  ],
+  "Discipline & Productivity Skills": [
+    {
+      "name": "Time Management",
+      "description": "Plan your day efficiently and prioritize tasks effectively.",
+      "icon": "⏰",
+      "level": 1,
+      "progress": 28
+    },
+    {
+      "name": "Self-Discipline",
+      "description": "Improve focus, consistency, and control over your habits.",
+      "icon": "🎯",
+      "level": 1,
+      "progress": 20
+    },
+    {
+      "name": "Adaptability",
+      "description": "Get better at handling unexpected challenges and changes.",
+      "icon": "🔄",
+      "level": 1,
+      "progress": 16
+    }
+  ],
+  "Education & Knowledge Skills": [
+    {
+      "name": "Learning Ability",
+      "description": "Improve how quickly and effectively you can understand new topics.",
+      "icon": "📚",
+      "level": 1,
+      "progress": 26
+    },
+{
+      "name": "Test SKill 1",
+      "description": "Testing this",
+      "icon": "⭐",
+      "level": 4,
+      "progress": 27
+    },
+    {
+      "name": "Strategy & Planning",
+      "description": "Develop ability to create long-term plans and execute them efficiently.",
+      "icon": "📈",
+      "level": 1,
+      "progress": 14
+    }
+  ],
+  "Extra Skills": [
+    {
+      "name": "Focus",
+      "description": "Ability to concentrate deeply on tasks without distraction.",
+      "icon": "🔍",
+      "level": 1,
+      "progress": 23
+    },
+    {
+      "name": "Emotional Control",
+      "description": "Manage your emotions and reactions in different situations.",
+      "icon": "🧘",
+      "level": 1,
+      "progress": 15
+    },
+    {
+      "name": "Critical Thinking",
+      "description": "Evaluate information objectively and make reasoned judgments.",
+      "icon": "🧐",
+      "level": 1,
+      "progress": 10
+    },
+    {
+      "name": "Leadership",
+      "description": "Guide, motivate, and influence others towards a goal.",
+      "icon": "🦁",
+      "level": 1,
+      "progress": 5
+    }
+  ]
+}

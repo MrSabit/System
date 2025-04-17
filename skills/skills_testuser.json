@@ -1,0 +1,35 @@
+{
+    "Physical & Strength Skills": [
+        {
+            "name": "Running",
+            "description": "Ability to run long distances",
+            "icon": "\ud83c\udfc3",
+            "level": 1,
+            "progress": 0,
+            "last_updated": "2025-04-11T21:28:22.012647"
+        }
+    ],
+    "Mental & Cognitive Skills": [
+        {
+            "name": "Problem Solving",
+            "description": "Ability to solve complex problems",
+            "icon": "\ud83d\udca1",
+            "level": 1,
+            "progress": 0,
+            "last_updated": "2025-04-11T21:28:22.013460"
+        }
+    ],
+    "Communication & Social Skills": [
+        {
+            "name": "Public Speaking",
+            "description": "Ability to speak in public effectively",
+            "icon": "\ud83d\udce2",
+            "level": 1,
+            "progress": 0,
+            "last_updated": "2025-04-11T21:28:22.014470"
+        }
+    ],
+    "Discipline & Productivity Skills": [],
+    "Education & Knowledge Skills": [],
+    "Extra Skills": []
+}

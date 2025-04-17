@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Objective - The Journey{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <div class="level-display">
+        <div class="level-header" style="justify-content: center;">
+            <div class="new-objective-title">New Objective</div>
+        </div>
+        
+        <form method="post" class="quest-form" id="create-objective-form">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" name="title" id="title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea name="description" id="description" rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="difficulty">Difficulty</label>
+                <select name="difficulty" id="difficulty">
+                    <option value="easy">Easy (50 XP)</option>
+                    <option value="medium" selected>Medium (100 XP)</option>
+                    <option value="hard">Hard (150 XP)</option>
+                    <option value="extreme">Extreme (200 XP)</option>
+                </select>
+            </div>
+            
+            <div class="form-group checkbox">
+                <input type="checkbox" name="set_active" id="set_active" checked>
+                <label for="set_active">Set as active objective</label>
+            </div>
+            
+            <div class="form-action">
+                <button type="submit" class="form-submit">Create Objective</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Flag to prevent duplicate form submissions and notifications
+    const objectiveFormInitialized = window.objectiveFormInitialized || false;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prevent duplicate event handlers
+        if (objectiveFormInitialized) {
+            console.log("Objective form handlers already initialized, skipping...");
+            return;
+        }
+        window.objectiveFormInitialized = true;
+        
+        const form = document.getElementById('create-objective-form');
+        
+        // Add submission handler to prevent multiple submissions
+        form.addEventListener('submit', function(e) {
+            // Disable the submit button to prevent multiple clicks
+            const submitButton = form.querySelector('.form-submit');
+            if (submitButton) {
+                if (submitButton.disabled) {
+                    // Form is already being submitted, prevent duplicate submission
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // Disable the button
+                submitButton.disabled = true;
+                submitButton.style.opacity = '0.7';
+                submitButton.innerText = 'Creating...';
+            }
+            
+            // Allow form submission to continue
+            return true;
+        });
+    });
+</script>
+{% endblock %} 

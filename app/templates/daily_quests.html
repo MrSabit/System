@@ -1,0 +1,433 @@
+{% extends 'base.html' %}
+
+{% block title %}Daily Quests - The Journey{% endblock %}
+
+{% block content %}
+<div class="content-container">
+    <div class="dashboard-header">
+        <h1>Daily Quests</h1>
+        <div class="progress-bar">
+            <div class="progress" style="width: {{ progress_percentage }}%;"></div>
+        </div>
+        <div class="progress-text">Level {{ user.level }} - {{ user.xp }} XP</div>
+    </div>
+
+    <!-- Reset Week Button and Modal -->
+    <div class="reset-week-container" style="margin: 20px 0;">
+        <button id="reset-week-btn" class="reset-week-btn" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+            Reset Week
+        </button>
+    </div>
+
+    <!-- Reset Confirmation Modal -->
+    <div id="reset-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div class="modal-content" style="background: white; margin: 100px auto; padding: 20px; width: 400px; border-radius: 8px;">
+            <h3 style="margin: 0 0 15px 0; color: #ef4444;">Reset Weekly Quests</h3>
+            <p style="margin: 10px 0; color: #000;">Are you sure you want to reset all weekly quest progress? This will clear all completed quests and start fresh.</p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button id="cancel-reset" style="background: #e5e7eb; color: #374151; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                <button id="confirm-reset" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div style="color: #94a3b8; font-size: 0.9rem; max-width: 80%;">
+            <i style="margin-right: 5px;">ℹ️</i> You have a {{ settings.grace_period_hours|default(12) }}-hour grace period after a day ends to complete your tasks before they're auto-submitted.
+        </div>
+        <a href="{{ url_for('journey.quest_settings') }}" class="quest-settings-btn" title="Quest Settings">⚙️</a>
+    </div>
+
+    <!-- Add grace period access button for previous day's quests -->
+    {% set current_day = all_days_tasks|selectattr('is_today', 'equalto', true)|first %}
+    {% set previous_day_index = (current_day.day_index - 1) % 7 %}
+    {% set previous_day = all_days_tasks|selectattr('day_index', 'equalto', previous_day_index)|first %}
+
+    {% if previous_day and not previous_day.is_completed and not previous_day.is_partial %}
+    <div id="grace-period-section" class="quest-section" style="margin-bottom: 20px; background: rgba(254, 240, 138, 0.2); padding: 15px; border-radius: 8px; display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3 style="color: #fbbf24; margin: 0;">Grace Period Active</h3>
+                <p style="margin: 5px 0 0; font-size: 0.9rem;">
+                    You can still complete yesterday's ({{ previous_day.day_name }}) tasks within your grace period.
+                    <span id="grace-hours-remaining"></span>
+                </p>
+            </div>
+            <button id="access-previous-day" class="quest-button" data-day="{{ previous_day_index }}" style="background: linear-gradient(135deg, #fbbf24, #d97706); color: white;">
+                Access Yesterday's Tasks
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="quest-tabs">
+        <div class="tab-header">
+            {% for day_data in all_days_tasks %}
+            <div class="tab-item {% if day_data.is_today %}active{% endif %} 
+                       {% if day_data.is_completed %}completed{% endif %} 
+                       {% if day_data.is_partial %}partial{% endif %}
+                       {% if day_data.is_failed %}failed{% endif %}
+                       {% if day_data.is_future and not day_data.is_completed and not day_data.is_partial %}future{% endif %}
+                       {% if day_data.is_available %}available{% endif %}"
+                 data-day="{{ day_data.day_index }}">
+                {{ day_data.day_name.split(' ')[0] }}
+                {% if day_data.is_completed %}
+                <span class="completion-checkmark">✓</span>
+                {% elif day_data.is_partial %}
+                <span class="partial-checkmark">◑</span>
+                {% elif day_data.is_failed %}
+                <span class="failed-mark">✗</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="tab-content">
+            {% for day_data in all_days_tasks %}
+            <div class="quest-container day-content" id="day-{{ day_data.day_index }}" 
+                 style="display: {% if day_data.is_today %}block{% else %}none{% endif %};">
+                <div class="quest-header">
+                    <h2>{{ day_data.day_name }}</h2>
+                    <p class="quest-subtitle">
+                        {% if day_data.is_completed %}
+                            You've completed these quests!
+                        {% elif day_data.is_partial %}
+                            You've partially completed these quests. You can continue tomorrow.
+                        {% elif day_data.is_failed %}
+                            You missed these quests! They'll be available again next week.
+                        {% elif day_data.is_future %}
+                            These quests will be available on {{ day_data.day_name.split(' ')[0] }}.
+                        {% elif day_data.is_available %}
+                            Complete today's quests to level up your character!
+                        {% else %}
+                            These quests are not available.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="quest-list">
+                    {% for task in day_data.tasks %}
+                    <div class="quest-item {% if day_data.is_failed %}failed-quest{% endif %} {% if day_data.is_partial %}partial-quest{% endif %}">
+                        <div class="quest-checkbox">
+                            <input type="checkbox" id="task-{{ day_data.day_index }}-{{ loop.index0 }}" 
+                                   class="quest-check" 
+                                   data-day="{{ day_data.day_index }}"
+                                   data-task="{{ loop.index0 }}"
+                                   {% if loop.index0|string in day_data.completed_tasks or day_data.is_completed %}checked{% endif %}
+                                   {% if day_data.is_completed or day_data.is_failed or day_data.is_partial %}disabled{% endif %}
+                                   {% if not day_data.is_available %}disabled{% endif %}>
+                            <label for="task-{{ day_data.day_index }}-{{ loop.index0 }}" class="quest-label"></label>
+                        </div>
+                        <div class="quest-text">{{ task }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="quest-progress">
+                    <span class="completed-count" id="completed-count-{{ day_data.day_index }}">
+                        {% if day_data.is_completed %}
+                            {{ day_data.tasks|length }}
+                        {% else %}
+                            {{ day_data.completed_tasks|length }}
+                        {% endif %}
+                    </span>/<span class="total-count">{{ day_data.tasks|length }}</span> tasks completed
+                </div>
+
+                <button class="quest-submit-btn {% if day_data.completed_tasks|length > 0 and not day_data.is_completed and not day_data.is_partial and day_data.is_available %}active{% endif %}" 
+                        id="complete-quests-{{ day_data.day_index }}"
+                        data-day="{{ day_data.day_index }}"
+                        {% if day_data.is_completed or day_data.is_failed or day_data.is_partial %}disabled{% endif %}
+                        {% if not day_data.is_available %}disabled{% endif %}>
+                    {% if day_data.is_completed %}
+                        Completed
+                    {% elif day_data.is_partial %}
+                        Partially Completed
+                    {% elif day_data.is_failed %}
+                        Failed - Try Again Next Week
+                    {% elif day_data.is_future %}
+                        Available on {{ day_data.day_name.split(' ')[0] }}
+                    {% elif not day_data.is_available %}
+                        Not Available
+                    {% else %}
+                        Complete Day
+                    {% endif %}
+                </button>
+
+                <!-- Add explanation of daily quest penalty system -->
+                <div class="penalty-explanation" style="font-size: 0.8rem; color: #94a3b8; margin-top: 10px; padding: 8px; background-color: rgba(220, 38, 38, 0.05); border-radius: 4px; border-left: 2px solid #ef4444;">
+                    <span style="color: #ef4444; font-weight: 600;">⚠️ Penalty System:</span> If you don't complete all quests, a penalty will be applied.
+                    <div style="margin-top: 4px;">Formula: Penalty % = (1 - ((Completed Tasks + Total Tasks) ÷ (2 × Total Tasks))) × 100%</div>
+                    <div style="margin-top: 4px;">The penalty will reduce all XP gains (except daily quests) for <span style="color: #ef4444; font-weight: 600;">exactly 24 hours</span>.</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Create a consistent notification utility function
+    function showNotification(message, type, title) {
+        console.log(`Notification request (${type}): ${message}`);
+        // Check if window.journeyNotification exists first
+        if (window.journeyNotification) {
+            // Use the global notification system
+            if (typeof window.journeyNotification.notify === 'function') {
+                window.journeyNotification.notify({
+                    title: title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Information'),
+                    message: message,
+                    type: type || 'info'
+                });
+            } else if (typeof window.journeyNotification.show === 'function') {
+                window.journeyNotification.show(message, type);
+            }
+        } else {
+            // Fallback to alert
+            alert((title ? title + ': ' : '') + message);
+        }
+    }
+
+    // Flag to prevent duplicate event handlers
+    const questEventHandlersInitialized = window.questEventHandlersInitialized || false;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prevent duplicate event handlers
+        if (questEventHandlersInitialized) {
+            console.log("Quest event handlers already initialized, skipping...");
+            return;
+        }
+        window.questEventHandlersInitialized = true;
+        
+        // Tab switching functionality
+        const tabItems = document.querySelectorAll('.tab-item');
+        const dayContents = document.querySelectorAll('.day-content');
+        
+        tabItems.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const dayIndex = this.getAttribute('data-day');
+                
+                // Hide all content
+                dayContents.forEach(content => {
+                    content.style.display = 'none';
+                });
+                
+                // Show selected content
+                document.getElementById(`day-${dayIndex}`).style.display = 'block';
+                
+                // Update active tab
+                tabItems.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+        
+        // Handle checkboxes
+        document.querySelectorAll('.quest-check').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const dayIndex = this.getAttribute('data-day');
+                const taskIndex = this.getAttribute('data-task');
+                const isChecked = this.checked;
+                
+                // Save checkbox state to server
+                fetch('/api/update_task_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        day_index: dayIndex,
+                        task_index: taskIndex,
+                        is_checked: isChecked
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update the completed count
+                        const checkboxes = document.querySelectorAll(`.quest-check[data-day="${dayIndex}"]`);
+                        const completedCount = document.getElementById(`completed-count-${dayIndex}`);
+                        const completeButton = document.getElementById(`complete-quests-${dayIndex}`);
+                        
+                        // Count checked boxes
+                        const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+                        const total = checkboxes.length;
+                        completedCount.textContent = checked;
+                        
+                        // Enable button when at least one task is completed
+                        if (checked > 0) {
+                            completeButton.classList.add('active');
+                            
+                            // Show a notification if task was checked (not if unchecked)
+                            if (isChecked) {
+                                showNotification(`Task marked as completed (${checked}/${total})`, 'info', 'Quest Progress');
+                            }
+                        } else {
+                            completeButton.classList.remove('active');
+                        }
+                    } else {
+                        showNotification('Error saving task status', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+        });
+        
+        // Handle quest completion
+        document.querySelectorAll('.quest-submit-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const dayIndex = parseInt(this.getAttribute('data-day'));
+                const checkboxes = document.querySelectorAll(`.quest-check[data-day="${dayIndex}"]`);
+                const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+                
+                if (checked > 0) {
+                    // Send request to complete the day
+                    fetch('/api/complete_daily_quest', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            day_index: dayIndex,
+                            completed_count: checked,
+                            total_count: checkboxes.length
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Get icon based on completion type
+                            const statusMessage = data.is_partial ? "partially completed" : "completed";
+                            const title = data.is_partial ? 'Quest Partially Completed' : 'Quest Completed';
+                            const message = `Congratulations! You've ${statusMessage} ${checked}/${checkboxes.length} of the quests and earned ${data.xp_earned} XP!`;
+                            
+                            showNotification(message, 'success', title);
+                            
+                            // Show level up notification if applicable
+                            if (data.level_up) {
+                                setTimeout(() => {
+                                    showNotification(`You've leveled up to level ${data.user_level}!`, 'success', 'Level Up!');
+                                }, 1000);
+                            }
+                            
+                            // Reload the page to update UI
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showNotification(data.message || 'Error completing quest', 'error', 'Error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification('An error occurred. Please try again.', 'error');
+                    });
+                } else {
+                    showNotification('You need to complete at least one quest!', 'warning');
+                }
+            });
+        });
+
+        // Check if grace period section exists
+        const gracePeriodSection = document.getElementById('grace-period-section');
+        const accessPreviousDayBtn = document.getElementById('access-previous-day');
+
+        if (gracePeriodSection && accessPreviousDayBtn) {
+            // Calculate time since day change
+            const now = new Date();
+            const dayStart = new Date();
+            dayStart.setHours(0, 0, 0, 0);
+            const hoursSinceDayChange = (now - dayStart) / (1000 * 60 * 60);
+            const gracePeriod = {{ settings.grace_period_hours|default(12) }};
+            
+            // Show section if within grace period
+            if (hoursSinceDayChange < gracePeriod) {
+                gracePeriodSection.style.display = 'block';
+                document.getElementById('grace-hours-remaining').textContent = 
+                    `You have ${(gracePeriod - hoursSinceDayChange).toFixed(1)} hours remaining.`;
+                
+                // Handle clicking on the access button
+                accessPreviousDayBtn.addEventListener('click', function() {
+                    const dayIndex = this.getAttribute('data-day');
+                    
+                    fetch('/api/access_previous_day_tasks', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            day_index: dayIndex
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotification(data.message, 'success', 'Grace Period');
+                            
+                            // Reload page to show the previous day's tasks
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showNotification(data.message, 'error', 'Grace Period');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification('An error occurred while accessing previous day tasks', 'error');
+                    });
+                });
+            }
+        }
+        
+        // Log grace period status if needed
+        {% if previous_day and not previous_day.is_completed and not previous_day.is_partial %}
+        console.log("Grace period active for previous day:", "{{ previous_day.day_name }}");
+        {% endif %}
+
+        // Reset Week Button Functionality
+        const resetBtn = document.getElementById('reset-week-btn');
+        const modal = document.getElementById('reset-modal');
+        const cancelBtn = document.getElementById('cancel-reset');
+        const confirmBtn = document.getElementById('confirm-reset');
+
+        resetBtn.addEventListener('click', function() {
+            modal.style.display = 'block';
+        });
+
+        cancelBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+
+        confirmBtn.addEventListener('click', function() {
+            fetch('/api/reset_week', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success', 'Week Reset');
+                    // Reload page to show fresh state
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showNotification(data.message, 'error', 'Error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while resetting week', 'error');
+            });
+            modal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+    });
+
+</script>
+{% endblock %} 

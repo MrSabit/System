@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}The Journey{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Include the mission styles and scripts if needed -->
+    {% if g.user and g.user.missions.filter_by(is_completed=False).first() %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/mission_theme.css') }}">
+        <script src="{{ url_for('static', filename='js/mission_effects.js') }}"></script>
+    {% endif %}
+    {% block extra_head %}{% endblock %}
+</head>
+<body {% if g.user and g.user.missions.filter_by(is_completed=False).first() %}data-mission-active="true"{% endif %}>
+    <!-- Rain Animation Container -->
+    <div class="rain-container" id="rainContainer"></div>
+
+    <!-- Sound Info -->
+    <div id="sound-info" style="position: fixed; bottom: 10px; right: 10px; background-color: rgba(25, 55, 109, 0.8); 
+                                padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 100; opacity: 0.9; 
+                                transition: opacity 0.5s ease-out; cursor: pointer;"
+         onclick="document.getElementById('sound-info').style.opacity='0';">
+        Hover for sound effects (tap to dismiss)
+    </div>
+
+    <!-- Audio Context Initializer (hidden) -->
+    <button id="audio-initializer" style="position: fixed; opacity: 0; pointer-events: none;">Initialize Audio</button>
+
+    <!-- Dashboard Container -->
+    <div class="dashboard">
+        {% if g.user %}
+        <!-- Navigation Menu -->
+        <nav class="nav-menu">
+            <a href="{{ url_for('journey.dashboard') }}" class="menu-link">
+                <div class="nav-item {% if request.endpoint == 'journey.dashboard' %}active{% endif %}">
+                    <span>Dashboard</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journey.stats') }}" class="menu-link">
+                <div class="nav-item {% if request.endpoint == 'journey.stats' %}active{% endif %}">
+                    <span>Stats</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journey.objectives') }}" class="menu-link">
+                <div class="nav-item {% if request.endpoint == 'journey.objectives' %}active{% endif %}">
+                    <span>Objectives</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journey.daily_quests') }}" class="menu-link">
+                <div class="nav-item {% if request.endpoint == 'journey.daily_quests' %}active{% endif %}">
+                    <span>Daily Quests</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journey.education') }}" class="menu-link">
+                <div class="nav-item {% if request.endpoint == 'journey.education' %}active{% endif %}">
+                    <span>Education</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journal.the_journal') }}" class="menu-link">
+                <div class="nav-item {% if request.endpoint == 'journal.the_journal' %}active{% endif %}">
+                    <span>Daily Journal</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journey.missions') }}" class="menu-link"{% if g.user.level < 7 %} style="opacity: 0.5; cursor: not-allowed;" title="Unlocked at level 7"{% endif %}>
+                <div class="nav-item {% if request.endpoint == 'journey.missions' %}active{% endif %}" style="background: linear-gradient(135deg, rgba(185, 28, 28, 0.1), rgba(239, 68, 68, 0.25)); border-left: 3px solid #dc2626;">
+                    <span style="color: #dc2626; font-weight: bold; text-shadow: 0 0 5px rgba(239, 68, 68, 0.3);">Missions</span>
+                </div>
+            </a>
+            <a href="{{ url_for('journey.logout') }}" class="menu-link">
+                <div class="nav-item">
+                    <span>Logout</span>
+                </div>
+            </a>
+        </nav>
+        {% endif %}
+
+        <!-- Flash Messages (hidden but kept for compatibility) -->
+        <div style="display: none;">
+            {% for message in get_flashed_messages() %}
+                <div class="flash-message flash-default">{{ message }}</div>
+            {% endfor %}
+            
+            {% for message in get_flashed_messages(with_categories=true) %}
+                {% if message[0] != 'message' %}
+                    <div class="flash-message flash-{{ message[0] }}">{{ message[1] }}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Main Content -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Notification Container -->
+    <div id="journey-notifications"></div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/notification.js') }}"></script>
+    <script>
+        // Hide sound info after 5 seconds
+        setTimeout(() => {
+            const soundInfo = document.getElementById('sound-info');
+            if (soundInfo) {
+                soundInfo.style.opacity = '0';
+                setTimeout(() => {
+                    soundInfo.style.display = 'none';
+                }, 500);
+            }
+        }, 5000);
+        
+        // Auto-initialize audio context on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Simulate a user interaction to initialize audio
+            setTimeout(() => {
+                document.getElementById('audio-initializer').click();
+            }, 50);
+            
+            // Request notification permission on page load
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                setTimeout(() => {
+                    window.journeyNotification?.requestPermission();
+                }, 3000);
+            }
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html> 

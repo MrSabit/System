@@ -1,0 +1,1251 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - The Journey{% endblock %}
+
+{% block content %}
+<style>
+    /* Gaming style progress bar - Redesigned */
+    .level-display {
+        position: relative;
+        padding: 24px 30px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(26, 32, 48, 0.95), rgba(35, 41, 70, 0.95));
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 0 15px rgba(99, 102, 241, 0.4);
+        margin-bottom: 30px;
+        border: 2px solid rgba(101, 126, 234, 0.4);
+        overflow: hidden;
+        transform: translateZ(0);
+    }
+    
+    /* Gaming style progress bar - Redesigned */
+    .level-display {
+        position: relative;
+        padding: 24px 30px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(26, 32, 48, 0.95), rgba(35, 41, 70, 0.95));
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 0 15px rgba(99, 102, 241, 0.4);
+        margin-bottom: 30px;
+        border: 2px solid rgba(101, 126, 234, 0.4);
+        overflow: hidden;
+        transform: translateZ(0);
+    }
+    
+    .level-display::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at center, rgba(99, 102, 241, 0.08) 0%, transparent 60%);
+        animation: pulse-bg 8s ease-in-out infinite;
+        z-index: 1;
+        pointer-events: none;
+    }
+    
+    .level-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 2;
+    }
+    
+    .level-badge-container {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex: 0 0 auto;
+    }
+    
+    .level-badge {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #3b82f6, #1e40af);
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.6), 
+                   inset 0 0 15px rgba(255, 255, 255, 0.4),
+                   0 5px 15px rgba(0, 0, 0, 0.3);
+        position: relative;
+        border: 3px solid rgba(255, 255, 255, 0.4);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        animation: subtle-float 6s ease-in-out infinite;
+    }
+    
+    .level-badge:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.8), 
+                   inset 0 0 20px rgba(255, 255, 255, 0.5),
+                   0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+    
+    .level-badge::after {
+        content: '';
+        position: absolute;
+        width: 118px;
+        height: 118px;
+        border-radius: 50%;
+        border: 2px solid rgba(147, 197, 253, 0.5);
+        animation: pulse-ring 3s ease-out infinite;
+    }
+    
+    .level-badge::before {
+        content: '';
+        position: absolute;
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        border: 1px solid rgba(147, 197, 253, 0.3);
+        animation: pulse-ring 3s ease-out infinite 1s;
+    }
+    
+    .main-level-text {
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 4px;
+        font-weight: 600;
+    }
+    
+    .level-number {
+        font-size: 3.2rem;
+        font-weight: bold;
+        background: linear-gradient(to bottom, #fff, #a5b4fc);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 0 0 25px rgba(165, 180, 252, 0.7);
+        line-height: 1;
+    }
+    
+    .level-stat-details {
+        flex-grow: 1;
+        padding-left: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .level-stat-title {
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .xp-text {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    
+    .current-xp {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #a5b4fc;
+        text-shadow: 0 0 10px rgba(165, 180, 252, 0.4);
+        margin-bottom: 4px;
+    }
+    
+    .xp-to-next {
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.7);
+        position: relative;
+    }
+    
+    .xp-to-next::after {
+        content: '';
+        display: block;
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(to right, transparent, rgba(165, 180, 252, 0.4), transparent);
+        margin-top: 2px;
+    }
+    
+    .progress-container {
+        position: relative;
+        height: 26px;
+        background: rgba(15, 23, 42, 0.7);
+        border-radius: 13px;
+        overflow: hidden;
+        box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.4), 0 0 5px rgba(59, 130, 246, 0.2);
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        z-index: 2;
+    }
+    
+    .progress-bar {
+        position: absolute;
+        height: 100%;
+        width: 0;
+        border-radius: 13px;
+        transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+        background: linear-gradient(
+            90deg, 
+            rgba(59, 130, 246, 0.8), 
+            rgba(79, 70, 229, 0.9)
+        );
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.8);
+    }
+    
+    .progress-bar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50%;
+        background: linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.4),
+            rgba(255, 255, 255, 0.1)
+        );
+    }
+    
+    .progress-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.5) 50%,
+            transparent 100%
+        );
+        animation: shimmer 2s infinite;
+        transform: translateX(-100%);
+    }
+    
+    .progress-notches {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        pointer-events: none;
+    }
+    
+    .progress-notch {
+        flex: 1;
+        position: relative;
+    }
+    
+    .progress-notch::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 1px;
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .progress-percentage {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 0.9rem;
+        font-weight: bold;
+        color: white;
+        text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+        z-index: 1;
+    }
+    
+    .game-pattern {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            linear-gradient(rgba(99, 102, 241, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(99, 102, 241, 0.07) 1px, transparent 1px);
+        background-size: 20px 20px;
+        z-index: 1;
+        opacity: 0.7;
+    }
+    
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+    
+    @keyframes pulse-ring {
+        0% { transform: scale(0.85); opacity: 0.6; }
+        50% { transform: scale(1); opacity: 0.3; }
+        100% { transform: scale(0.85); opacity: 0.6; }
+    }
+    
+    @keyframes pulse-bg {
+        0% { opacity: 0.5; transform: scale(0.95); }
+        50% { opacity: 0.7; transform: scale(1); }
+        100% { opacity: 0.5; transform: scale(0.95); }
+    }
+    
+    @keyframes subtle-float {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+        100% { transform: translateY(0); }
+    }
+    
+    /* Mission animations */
+    @keyframes mission-btn-shine {
+        0% { left: -100%; }
+        20% { left: 100%; }
+        100% { left: 100%; }
+    }
+    
+    @keyframes mission-pulse {
+        0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+        50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+        100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+    }
+    
+    /* Skill management button */
+    .manage-skills-btn {
+        background: linear-gradient(135deg, #3b82f6, #1e40af);
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-left: 15px;
+    }
+    
+    .manage-skills-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+    }
+    
+    .manage-skills-btn i {
+        font-size: 1.2rem;
+    }
+
+    .skills-section {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .stats-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #fff;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .view-all-btn {
+        color: #60a5fa;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: color 0.2s ease;
+    }
+
+    .view-all-btn:hover {
+        color: #3b82f6;
+    }
+
+    .skills-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 24px;
+    }
+
+    .skill-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        transition: transform 0.2s ease, background-color 0.2s ease;
+        min-width: 180px;
+    }
+
+    .skill-icon-wrapper {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 12px;
+    }
+
+    .skill-icon {
+        font-size: 2.2rem;
+        color: #fff;
+        transition: transform 0.2s ease;
+    }
+
+    .skill-name {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #fff;
+        text-transform: capitalize;
+        margin-bottom: 8px;
+    }
+
+    .skill-level-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .skill-level {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #60a5fa;
+        min-width: 32px;
+        text-align: right;
+    }
+
+    .skill-progress-bar {
+        width: 100%;
+        max-width: 140px;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+        transition: all 0.3s ease;
+        margin: 10px auto;
+    }
+
+    .skill-progress {
+        height: 100%;
+        background: linear-gradient(135deg, #3b82f6, #1e40af);
+        border-radius: 3px;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+
+    .skill-card:hover .skill-progress-bar {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .skill-card:hover .skill-progress {
+        background: linear-gradient(135deg, #4338ca, #3730a3);
+    }
+
+    @keyframes progress-bar {
+        0% {
+            width: 0%;
+        }
+    }
+
+    .skill-progress-bar .skill-progress {
+        animation: progress-bar 0.5s ease-out forwards;
+    }
+
+    .skill-category {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        color: #a1a1aa;
+        margin-top: 12px;
+    }
+
+    .category-text {
+        font-weight: 500;
+    }
+
+    .custom-badge {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.2);
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+
+    .skill-card:hover .custom-badge {
+        background: rgba(239, 68, 68, 0.3);
+    }
+</style>
+
+<div class="dashboard-content">
+    <!-- Redesigned Level Display -->
+    <div class="level-display">
+        <div class="game-pattern"></div>
+        
+        <div class="level-header">
+            <div class="level-badge-container">
+                <div class="level-badge">
+                    <div class="main-level-text">Level</div>
+                    <div class="level-number">{{ user.level }}</div>
+                </div>
+                
+                <div class="level-stat-details">
+                    <div class="level-stat-title">Current Progress</div>
+                    <div class="level-stat-value">{{ user.xp }} / {{ user.xp_to_next_level }} XP</div>
+                </div>
+            </div>
+            
+            <div class="xp-text">
+                <div class="current-xp">{{ user.xp }} XP</div>
+                <div class="xp-to-next">{{ user.xp_to_next_level - user.xp }} XP to level {{ user.level + 1 }}</div>
+            </div>
+            
+            <!-- Add Manage Skills button -->
+            <a href="/stats" class="manage-skills-btn">
+                <i class="fas fa-cogs"></i>
+                Manage Skills
+            </a>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar" data-progress="{{ progress_percentage if progress_percentage is not none else 0 }}"></div>
+            <div class="progress-notches">
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+                <div class="progress-notch"></div>
+            </div>
+            <div class="progress-percentage" id="progressPercentage">{{ progress_percentage|int if progress_percentage is not none else 0 }}%</div>
+        </div>
+    </div>
+
+    <!-- Stats Section (After Level Progress Bar) -->
+    <div class="stats-section" style="margin-top: 10px;">
+        {% if has_penalty_table %}
+            {% set penalties = g.user.penalties|selectattr('is_active', 'eq', true)|selectattr('end_date', 'gt', now)|list %}
+            {% if penalties %}
+            <div style="background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(185, 28, 28, 0.2)); border-left: 4px solid #dc2626; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                <div style="font-weight: bold; color: #ef4444; margin-bottom: 8px;">Active Penalties ({{ penalties|length }})</div>
+                <ul style="list-style-type: none; padding: 0; margin: 0; font-size: 14px;">
+                    {% for penalty in penalties %}
+                    <li style="margin-bottom: 10px; color: #f87171; padding: 8px; background-color: rgba(220, 38, 38, 0.05); border-radius: 4px;">
+                        <span style="color: #f87171; font-weight: 600;">{{ penalty.reason }}</span>
+                        <div style="font-size: 12px; color: #94a3b8; margin-top: 3px;">
+                            {{ (100 * (1 - penalty.penalty_rate))|int }}% XP reduction until {{ penalty.end_date.strftime('%Y-%m-%d %H:%M') }}
+                            {% set time_diff = penalty.end_date - now %}
+                            {% set total_seconds = time_diff.total_seconds() %}
+                            {% set total_hours = (total_seconds / 3600)|int %}
+                            {% set days = time_diff.days %}
+                            {% set hours = (time_diff.seconds // 3600) %}
+                            {% set minutes = ((time_diff.seconds % 3600) // 60) %}
+                            
+                            {% if penalty.difficulty == 'daily' %}
+                                (24 hours total, {{ total_hours }} hour{% if total_hours != 1 %}s{% endif %} remaining)
+                            {% elif penalty.difficulty == 'mission' %}
+                                (9 days total, {{ days }} day{% if days != 1 %}s{% endif %} {{ hours }} hour{% if hours != 1 %}s{% endif %} remaining)
+                            {% else %}
+                                ({% if penalty.difficulty == 'easy' %}3{% elif penalty.difficulty == 'medium' %}5{% elif penalty.difficulty == 'hard' %}7{% elif penalty.difficulty == 'extreme' %}9{% else %}5{% endif %} days total, {{ days }} day{% if days != 1 %}s{% endif %} {{ hours }} hour{% if hours != 1 %}s{% endif %} remaining)
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div style="font-size: 13px; margin-top: 10px; color: #94a3b8;">
+                    Your current XP multiplier: {{ (g.user.get_xp_multiplier() * 100)|int }}%
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+            <div style="margin-top: 20px;">
+                <a href="{{ url_for('journey.setup_penalty_table') }}" style="background: linear-gradient(135deg, #3b82f6, #1e40af); color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">Setup Penalty System</a>
+            </div>
+        {% endif %}
+    </div>
+
+    {% set active_mission = user.missions.filter_by(is_completed=False).first() %}
+    {% if active_mission %}
+    <!-- Mission Card - New Design -->
+    <div class="mission-card">
+        <div class="mission-header">ACTIVE MISSION <span style="opacity: 0.6;">// {{ active_mission.difficulty|upper }}</span></div>
+        
+        <div class="mission-details">
+            <div class="mission-title">{{ active_mission.title }}</div>
+            
+            <div class="mission-description">{{ active_mission.description }}</div>
+            
+            {% if active_mission.requirements %}
+            <div class="mission-requirements">
+                <div class="mission-requirements-title">Requirements</div>
+                <div class="mission-requirements-text" style="white-space: pre-wrap;">{{ active_mission.requirements }}</div>
+            </div>
+            {% endif %}
+            
+            <div class="mission-footer">
+                <div class="mission-meta">
+                    <div class="mission-reward">
+                        REWARD: <span class="mission-reward-value">500 XP</span>
+                    </div>
+                    
+                    {% if active_mission.estimated_duration %}
+                    <div class="mission-duration">
+                        ESTIMATED TIME: {{ active_mission.estimated_duration }}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mission-actions">
+                    <a href="{{ url_for('journey.missions') }}" class="mission-action-btn">DETAILS</a>
+                    {% if user.level >= 7 %}
+                    <form action="{{ url_for('journey.complete_mission', id=active_mission.id) }}" method="post">
+                        <button type="submit" class="mission-action-btn">COMPLETE</button>
+                    </form>
+                    {% else %}
+                    <button type="button" class="mission-action-btn" style="opacity: 0.5; cursor: not-allowed;" title="Requires Level 7+">COMPLETE</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Current Objective Section -->
+    <div class="objective-card" style="position: relative; background: linear-gradient(135deg, rgba(20, 20, 25, 0.95), rgba(40, 50, 70, 0.95)); border-radius: 20px; padding: 24px 30px; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4); overflow: hidden; border: 2px solid rgba(59, 130, 246, 0.4); margin-bottom: 30px; max-width: 100%;">
+        <!-- Background Layers -->
+        <div class="objective-bg-layer1" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(30, 30, 35, 0.8);"></div>
+        <div class="objective-bg-layer2" style="position: absolute; top: 0; right: 0; width: 200px; height: 200px; background: radial-gradient(circle at center, rgba(59, 130, 246, 0.3) 0%, transparent 70%); z-index: 0;"></div>
+        
+        <!-- Main Box -->
+        <div class="objective-main" style="position: relative; z-index: 2; width: 100%;">
+            <div class="objective-content">
+                <div class="objective-title" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; color: white; text-shadow: 0 0 15px rgba(59, 130, 246, 0.7);">CURRENT OBJECTIVE</div>
+                <div class="objective-text" style="font-size: 1.2rem; color: #d1d5db; max-width: 600px; margin-bottom: 15px;">{{ active_objective.title if active_objective else "No active objective. Set one!" }}</div>
+                {% if active_objective %}
+                <div class="objective-difficulty" style="margin-top: 5px; font-size: 14px; color: #94a3b8;">
+                    Difficulty: {{ active_objective.difficulty|capitalize }} ({% if active_objective.difficulty == 'easy' %}50{% elif active_objective.difficulty == 'hard' %}150{% elif active_objective.difficulty == 'extreme' %}200{% else %}100{% endif %} XP)
+                </div>
+
+                {% if active_objective.description %}
+                <div class="description-container" style="margin-top: 15px;">
+                    <button type="button" class="description-toggle" onclick="toggleDescription(this)" style="background: rgba(59, 130, 246, 0.2); color: #e2e8f0; padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.4); cursor: pointer; display: flex; align-items: center; transition: all 0.3s ease; font-size: 0.9rem; font-weight: 500; width: fit-content;">
+                        <span class="toggle-icon" style="font-size: 1.2rem; margin-right: 8px;">+</span> View Details
+                    </button>
+                    <div class="objective-description-dropdown" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid rgba(71, 85, 105, 0.3); border-radius: 8px; background-color: rgba(30, 41, 59, 0.8); animation: fadeIn 0.3s ease-in-out;">
+                        <p style="color: #94a3b8; line-height: 1.6; margin: 0; white-space: pre-wrap;">{{ active_objective.description }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div style="margin-top: 20px; display: flex; gap: 10px;">
+                    <form action="{{ url_for('journey.complete_objective', id=active_objective.id) }}" method="post">
+                        <button type="submit" style="background: linear-gradient(135deg, #3b82f6, #1e40af); color: white; font-weight: bold; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">Complete</button>
+                    </form>
+                    
+                    <form action="{{ url_for('journey.fail_objective', id=active_objective.id) }}" method="post">
+                        <button type="submit" style="background: linear-gradient(135deg, #dc2626, #991b1b); color: white; font-weight: bold; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);"
+                            onclick="return confirm('Are you sure you want to mark this objective as failed? This will apply an XP penalty for {{ {'easy': 3, 'medium': 5, 'hard': 7, 'extreme': 9}[active_objective.difficulty] }} days.');">Fail</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Skills Overview -->
+    <div class="skills-section">
+        <div class="section-header">
+            <div class="level-text stats-title">Top Skills</div>
+            <a href="{{ url_for('journey.stats') }}" class="view-all-btn">View All Skills</a>
+        </div>
+        <div class="skills-grid">
+            {% for skill in top_skills %}
+            <div class="skill-card">
+                <div class="skill-icon-wrapper">
+                    <div class="skill-icon">{{ skill.icon|safe }}</div>
+                </div>
+                <div class="skill-info">
+                    <div class="skill-name">{{ skill.name }}</div>
+                    <div class="skill-level-container">
+                        <div class="skill-level">{{ "%.0f"|format(skill.value) }}</div>
+                    </div>
+                    <div class="skill-progress-bar">
+                        <div class="skill-progress" style="width: {{ "%.0f"|format((skill.value % 1) * 100) }}%"></div>
+                    </div>
+                    <div class="skill-category">
+                        <span class="category-text">{{ skill.category }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        // Initialize notification system
+        if (!window.journeyNotification) {
+            window.journeyNotification = new JourneyNotification();
+        }
+
+        // Process any flash messages on page load
+        window.journeyNotification.processFlashMessages();
+
+        // Check for server notifications
+        function checkNotifications() {
+            fetch('/api/get_notifications')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.notifications && data.notifications.length > 0) {
+                        data.notifications.forEach(notification => {
+                            window.journeyNotification.notify(notification);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking notifications:', error);
+                });
+        }
+
+        // Check notifications on page load and periodically
+        document.addEventListener('DOMContentLoaded', () => {
+            checkNotifications();
+            setInterval(checkNotifications, 30000); // Check every 30 seconds
+        });
+
+        // Animate the progress bar on load and setup level display interactivity
+        document.addEventListener('DOMContentLoaded', function() {
+            const progressBar = document.getElementById('progressBar');
+            const levelBadge = document.querySelector('.level-badge');
+            
+            if (progressBar) {
+                let progress = progressBar.getAttribute('data-progress');
+                // Handle null, undefined, or NaN values
+                progress = (progress !== null && progress !== undefined && !isNaN(progress)) ? parseFloat(progress) : 0;
+                progressBar.style.width = progress + '%';
+            }
+            
+            // Add click effect to level badge
+            if (levelBadge) {
+                levelBadge.addEventListener('click', function() {
+                    // Create burst effect
+                    createBurstEffect(this);
+                    
+                    // Apply pulse animation
+                    this.classList.add('level-badge-pulse');
+                    setTimeout(() => {
+                        this.classList.remove('level-badge-pulse');
+                    }, 700);
+                });
+            }
+            
+            // Level badge burst effect
+            function createBurstEffect(badge) {
+                const rect = badge.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                for (let i = 0; i < 12; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'level-particle';
+                    
+                    // Style the particle
+                    particle.style.position = 'fixed';
+                    particle.style.width = '8px';
+                    particle.style.height = '8px';
+                    particle.style.borderRadius = '50%';
+                    particle.style.backgroundColor = '#3b82f6';
+                    particle.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.8)';
+                    particle.style.zIndex = '9999';
+                    particle.style.pointerEvents = 'none';
+                    
+                    // Position at center of badge
+                    particle.style.left = `${centerX}px`;
+                    particle.style.top = `${centerY}px`;
+                    
+                    // Calculate direction and distance
+                    const angle = (i / 12) * Math.PI * 2;
+                    const distance = 60 + Math.random() * 40;
+                    const duration = 600 + Math.random() * 400;
+                    
+                    // Apply animation
+                    particle.style.transition = `all ${duration/1000}s cubic-bezier(0.1, 0.8, 0.2, 1)`;
+                    
+                    document.body.appendChild(particle);
+                    
+                    // Trigger animation after a small delay
+                    setTimeout(() => {
+                        const x = Math.cos(angle) * distance;
+                        const y = Math.sin(angle) * distance;
+                        particle.style.transform = `translate(${x}px, ${y}px) scale(0)`;
+                        particle.style.opacity = '0';
+                        
+                        // Remove after animation completes
+                        setTimeout(() => {
+                            if (document.body.contains(particle)) {
+                                document.body.removeChild(particle);
+                            }
+                        }, duration);
+                    }, 10);
+                }
+            }
+            
+            // Add glow effect based on progress percentage
+            function updateGlowEffect(progress) {
+                const levelDisplay = document.querySelector('.level-display');
+                if (levelDisplay) {
+                    const intensity = Math.min(20, progress / 5); // Cap at 20px
+                    levelDisplay.style.boxShadow = `0 15px 35px rgba(0, 0, 0, 0.3), 0 0 ${intensity + 15}px rgba(99, 102, 241, 0.5)`;
+                }
+            }
+            
+            // Create particle effects
+            function createParticles() {
+                const progressContainer = document.querySelector('.progress-container');
+                const progress = parseFloat(document.getElementById('progressBar').getAttribute('data-progress'));
+                
+                // Only add particles if progress is meaningful
+                if (progress < 10) return;
+                
+                const particleCount = Math.min(20, Math.floor(progress / 5));
+                
+                for (let i = 0; i < particleCount; i++) {
+                    setTimeout(() => {
+                        const particle = document.createElement('div');
+                        particle.className = 'progress-particle';
+                        particle.style.position = 'absolute';
+                        particle.style.width = '4px';
+                        particle.style.height = '4px';
+                        
+                        // Random particle type (star or circle)
+                        const isCircle = Math.random() > 0.5;
+                        
+                        if (isCircle) {
+                            particle.style.borderRadius = '50%';
+                            particle.style.backgroundColor = '#a5b4fc';
+                        } else {
+                            particle.style.backgroundColor = 'transparent';
+                            const size = Math.floor(Math.random() * 10) + 15;
+                            particle.style.width = size + 'px';
+                            particle.style.height = size + 'px';
+                            
+                            // Create star shape
+                            particle.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='${encodeURIComponent('#a5b4fc')}'/%3E%3Cpath d='M12 1l3.22 6.52 7.2.61-5.2 5.04 1.5 7.13-6.7-3.5-6.72 3.52 1.5-7.14-5.2-5.05 7.2-.6z'/%3E%3C/svg%3E")`;
+                        }
+                        
+                        particle.style.opacity = Math.random() * 0.6 + 0.4;
+                        particle.style.boxShadow = `0 0 10px #a5b4fc`;
+                        
+                        // Position at center
+                        const centerX = window.innerWidth / 2;
+                        const centerY = window.innerHeight / 2;
+                        particle.style.left = `${centerX}px`;
+                        particle.style.top = `${centerY}px`;
+                        
+                        // Animation
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = 50 + Math.random() * 200;
+                        const duration = 1000 + Math.random() * 2000;
+                        
+                        const targetX = centerX + Math.cos(angle) * distance;
+                        const targetY = centerY + Math.sin(angle) * distance;
+                        
+                        particle.style.transition = `all ${duration/1000}s cubic-bezier(0.22, 1, 0.36, 1)`;
+                        
+                        progressContainer.appendChild(particle);
+                        
+                        // Trigger animation
+                        setTimeout(() => {
+                            particle.style.transform = `translate(${targetX - centerX}px, ${targetY - centerY}px) rotate(${Math.random() * 360}deg)`;
+                            particle.style.opacity = '0';
+                        }, 50);
+                        
+                        // Clean up
+                        setTimeout(() => {
+                            if (progressContainer.contains(particle)) {
+                                progressContainer.removeChild(particle);
+                            }
+                        }, duration + 100);
+                    }, i * 200 + Math.random() * 1000);
+                }
+            }
+            
+            // Add both hover and click handling for tooltips
+            const skillCards = document.querySelectorAll('.skill-card');
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            
+            skillCards.forEach(card => {
+                let hoverTimer;
+                let tooltipVisible = false;
+                const tooltip = card.querySelector('.skill-tooltip');
+                
+                if (isTouchDevice) {
+                    // For touch devices, toggle tooltip on click/tap
+                    card.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('skill-increase')) {
+                            return; // Don't show tooltip when clicking the + button
+                        }
+                        
+                        // Toggle tooltip visibility
+                        if (!tooltipVisible) {
+                            // Hide all other tooltips first
+                            document.querySelectorAll('.skill-tooltip.visible').forEach(t => {
+                                if (t !== tooltip) t.classList.remove('visible');
+                            });
+                            
+                            tooltip.classList.add('visible');
+                            tooltipVisible = true;
+                        } else {
+                            tooltip.classList.remove('visible');
+                            tooltipVisible = false;
+                        }
+                    });
+                    
+                    // Close tooltip when clicking elsewhere
+                    document.addEventListener('click', (e) => {
+                        if (!card.contains(e.target) && tooltipVisible) {
+                            tooltip.classList.remove('visible');
+                            tooltipVisible = false;
+                        }
+                    });
+                } else {
+                    // For desktop, use hover with a delay
+                    card.addEventListener('mouseenter', (event) => {
+                        // Skip if hovering on the + button
+                        if (event.target.classList.contains('skill-increase') || 
+                            event.target.closest('.skill-increase')) {
+                            return;
+                        }
+                        
+                        // Clear any existing timers and reset tooltip state
+                        clearTimeout(hoverTimer);
+                        tooltip.classList.remove('visible');
+                        
+                        // Add hovering class immediately for visual feedback
+                        card.classList.add('hovering');
+                        
+                        // Create/update loading text element
+                        let loadingText = card.querySelector('.loading-text');
+                        if (!loadingText) {
+                            loadingText = document.createElement('div');
+                            loadingText.className = 'loading-text loading';
+                            loadingText.textContent = 'Hold for info...';
+                            card.appendChild(loadingText);
+                        } else {
+                            loadingText.style.display = 'block';
+                            loadingText.className = 'loading-text loading';
+                        }
+                        
+                        // Set exact timestamp when hover started
+                        card.setAttribute('data-hover-start', Date.now());
+                        
+                        // Set the timer for exactly 5 seconds
+                        hoverTimer = setTimeout(() => {
+                            // Double check we've hovered for the full duration
+                            const hoverStart = parseInt(card.getAttribute('data-hover-start'));
+                            const hoverDuration = Date.now() - hoverStart;
+                            
+                            if (hoverDuration >= 5000) {
+                                tooltip.classList.add('visible');
+                                console.log('Tooltip shown after ' + (hoverDuration/1000).toFixed(1) + ' seconds');
+                                
+                                // Hide loading text when tooltip is visible
+                                if (loadingText) {
+                                    loadingText.style.display = 'none';
+                                }
+                            }
+                        }, 5000); // Exactly 5 seconds
+                    });
+                    
+                    card.addEventListener('mouseleave', () => {
+                        clearTimeout(hoverTimer);
+                        tooltip.classList.remove('visible');
+                        card.classList.remove('hovering');
+                        
+                        // Hide loading text
+                        const loadingText = card.querySelector('.loading-text');
+                        if (loadingText) {
+                            loadingText.style.display = 'none';
+                        }
+                        
+                        // Reset hover timestamp
+                        card.removeAttribute('data-hover-start');
+                    });
+                }
+                
+                // Special handling for the + button to prevent showing tooltip
+                const increaseBtn = card.querySelector('.skill-increase');
+                if (increaseBtn) {
+                    increaseBtn.addEventListener('mouseenter', (e) => {
+                        // Stop event propagation
+                        e.stopPropagation();
+                        // Remove hovering state if it was active
+                        clearTimeout(hoverTimer);
+                        card.classList.remove('hovering');
+                    });
+                }
+            });
+            
+            // Apply category-specific classes to tooltips
+            document.querySelectorAll('.skill-card').forEach(card => {
+                const category = card.querySelector('.skill-category').textContent.trim().toLowerCase();
+                const tooltip = card.querySelector('.skill-tooltip');
+                
+                if (category.includes('physical')) {
+                    tooltip.classList.add('tooltip-physical');
+                } else if (category.includes('mental')) {
+                    tooltip.classList.add('tooltip-mental');
+                } else if (category.includes('communication')) {
+                    tooltip.classList.add('tooltip-communication');
+                } else if (category.includes('productivity')) {
+                    tooltip.classList.add('tooltip-productivity');
+                } else if (category.includes('education')) {
+                    tooltip.classList.add('tooltip-education');
+                }
+            });
+            
+            // Initialize skill increase buttons
+            const increaseButtons = document.querySelectorAll('.skill-increase');
+            increaseButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const skill = this.getAttribute('data-skill');
+                    const currentLevel = parseInt(this.getAttribute('data-current'));
+                    
+                    // Call API to increase skill level
+                    fetch('/api/increase_skill', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            skill: skill,
+                            current_level: currentLevel
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update the level display
+                            const levelDisplay = this.parentElement.querySelector('.skill-level');
+                            levelDisplay.textContent = data.new_value.toFixed(1);
+                            
+                            // Update the button's data attribute
+                            this.setAttribute('data-current', data.new_value);
+                            
+                            // If there was a level up, show a notification
+                            if (data.level_up) {
+                                if (window.journeyNotification) {
+                                    window.journeyNotification.notify({
+                                        title: 'Level Up!',
+                                        message: `Congratulations! You leveled up to level ${data.level}!`,
+                                        type: 'success'
+                                    });
+                                } else {
+                                    alert('Congratulations! You leveled up to level ' + data.level + '!');
+                                }
+                                
+                                // Play level up effect
+                                createLevelUpEffect();
+                            } else {
+                                // Show XP gained notification
+                                if (window.journeyNotification) {
+                                    let message = `Skill increased! +1 to ${skill}. You earned ${data.xp_earned} XP.`;
+                                    
+                                    // Add penalty information if applicable
+                                    if (data.penalty_applied) {
+                                        message = `Skill increased! +1 to ${skill}. You earned ${data.xp_earned} XP (${data.penalty_percent}% penalty applied).`;
+                                    }
+                                    
+                                    window.journeyNotification.notify({
+                                        title: 'Skill Increased',
+                                        message: message,
+                                        type: 'success'
+                                    });
+                                }
+                            }
+                            
+                            // Update XP display
+                            const xpElement = document.getElementById('user-xp');
+                            if (xpElement) {
+                                xpElement.textContent = data.user_xp;
+                            }
+                            
+                            // Update progress bar
+                            const progressBar = document.querySelector('.level-progress-bar-fill');
+                            if (progressBar) {
+                                progressBar.style.width = data.progress + '%';
+                            }
+                        } else {
+                            alert(data.message || 'Error increasing skill level');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while increasing the skill level');
+                    });
+                });
+            });
+        });
+
+        // Add this function to the existing DOM content loaded event listener
+        function createLevelUpEffect() {
+            // Create container for the level up effect
+            const effectContainer = document.createElement('div');
+            effectContainer.className = 'level-up-effect-container';
+            effectContainer.style.position = 'fixed';
+            effectContainer.style.top = '0';
+            effectContainer.style.left = '0';
+            effectContainer.style.width = '100%';
+            effectContainer.style.height = '100%';
+            effectContainer.style.pointerEvents = 'none';
+            effectContainer.style.zIndex = '9999';
+            effectContainer.style.overflow = 'hidden';
+            document.body.appendChild(effectContainer);
+            
+            // Create the level up text
+            const levelUpText = document.createElement('div');
+            levelUpText.className = 'level-up-text';
+            levelUpText.textContent = 'LEVEL UP!';
+            levelUpText.style.position = 'absolute';
+            levelUpText.style.top = '50%';
+            levelUpText.style.left = '50%';
+            levelUpText.style.transform = 'translate(-50%, -50%) scale(0)';
+            levelUpText.style.fontSize = '72px';
+            levelUpText.style.fontWeight = 'bold';
+            levelUpText.style.color = '#fff';
+            levelUpText.style.textShadow = '0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(59, 130, 246, 0.6)';
+            levelUpText.style.opacity = '0';
+            levelUpText.style.transition = 'all 0.8s cubic-bezier(0.22, 1, 0.36, 1)';
+            effectContainer.appendChild(levelUpText);
+            
+            // Create particles
+            for (let i = 0; i < 60; i++) {
+                createLevelUpParticle(effectContainer);
+            }
+            
+            // Animate text
+            setTimeout(() => {
+                levelUpText.style.opacity = '1';
+                levelUpText.style.transform = 'translate(-50%, -50%) scale(1)';
+            }, 100);
+            
+            // Clean up
+            setTimeout(() => {
+                levelUpText.style.opacity = '0';
+                levelUpText.style.transform = 'translate(-50%, -50%) scale(1.5)';
+                
+                setTimeout(() => {
+                    if (document.body.contains(effectContainer)) {
+                        document.body.removeChild(effectContainer);
+                    }
+                }, 1000);
+            }, 2500);
+        }
+
+        function createLevelUpParticle(container) {
+            const particle = document.createElement('div');
+            
+            // Random particle type (star or circle)
+            const isCircle = Math.random() > 0.5;
+            
+            particle.style.position = 'absolute';
+            particle.style.width = isCircle ? '10px' : '15px';
+            particle.style.height = isCircle ? '10px' : '15px';
+            
+            if (isCircle) {
+                particle.style.borderRadius = '50%';
+                particle.style.backgroundColor = getRandomColor();
+            } else {
+                particle.style.backgroundColor = 'transparent';
+                const size = Math.floor(Math.random() * 10) + 15;
+                particle.style.width = size + 'px';
+                particle.style.height = size + 'px';
+                
+                // Create star shape
+                particle.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='${encodeURIComponent(getRandomColor())}'/%3E%3Cpath d='M12 1l3.22 6.52 7.2.61-5.2 5.04 1.5 7.13-6.7-3.5-6.72 3.52 1.5-7.14-5.2-5.05 7.2-.6z'/%3E%3C/svg%3E")`;
+            }
+            
+            particle.style.opacity = Math.random() * 0.6 + 0.4;
+            particle.style.boxShadow = `0 0 10px ${getRandomColor(0.6)}`;
+            
+            // Position at center
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            particle.style.left = `${centerX}px`;
+            particle.style.top = `${centerY}px`;
+            
+            // Animation
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 50 + Math.random() * 200;
+            const duration = 1000 + Math.random() * 2000;
+            
+            const targetX = centerX + Math.cos(angle) * distance;
+            const targetY = centerY + Math.sin(angle) * distance;
+            
+            particle.style.transition = `all ${duration/1000}s cubic-bezier(0.22, 1, 0.36, 1)`;
+            
+            container.appendChild(particle);
+            
+            // Trigger animation
+            setTimeout(() => {
+                particle.style.transform = `translate(${targetX - centerX}px, ${targetY - centerY}px) rotate(${Math.random() * 360}deg)`;
+                particle.style.opacity = '0';
+            }, 50);
+            
+            // Clean up
+            setTimeout(() => {
+                if (container.contains(particle)) {
+                    container.removeChild(particle);
+                }
+            }, duration + 100);
+        }
+
+        function getRandomColor(alpha = 1) {
+            const colors = [
+                `rgba(59, 130, 246, ${alpha})`,   // Blue
+                `rgba(99, 102, 241, ${alpha})`,   // Indigo
+                `rgba(139, 92, 246, ${alpha})`,   // Purple
+                `rgba(248, 113, 113, ${alpha})`,  // Red
+                `rgba(251, 191, 36, ${alpha})`,   // Yellow
+                `rgba(52, 211, 153, ${alpha})`,   // Emerald
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        // Function to toggle description visibility
+        function toggleDescription(button) {
+            const dropdown = button.nextElementSibling;
+            dropdown.style.display = dropdown.style.display === 'none' || dropdown.style.display === '' ? 'block' : 'none';
+            button.querySelector('.toggle-icon').textContent = dropdown.style.display === 'none' ? '+' : '-';
+        }
+    </script>
+
+    <!-- Add keyframes for fadeIn animation -->
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+{% endblock %}

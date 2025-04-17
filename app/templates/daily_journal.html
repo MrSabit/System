@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Journal{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/journal.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="journal-container">
+    <div class="journal-header">
+        <h1>Daily Journal</h1>
+        <p class="journal-subtitle">Record your thoughts for today.</p>
+        <div class="journal-actions">
+            <a href="{{ url_for('journal.the_journal') }}" class="action-btn">
+                <i class="fas fa-calendar-alt"></i> Open The Journal (Advanced)
+            </a>
+        </div>
+    </div>
+
+    <div class="journal-content">
+        <div class="form-section">
+            <form id="journalForm">
+                <div class="form-group">
+                    <label for="journalDate">Date</label>
+                    <input type="date" id="journalDate" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="entryTitle">Title</label>
+                    <input type="text" id="entryTitle" class="form-control" placeholder="Title for your journal entry">
+                </div>
+                
+                <div class="form-group">
+                    <label for="entryContent">Content</label>
+                    <textarea id="entryContent" class="form-control" rows="10" placeholder="Write your thoughts here..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="entryGoals">Goals (Optional)</label>
+                    <textarea id="entryGoals" class="form-control" rows="3" placeholder="What are your goals for today?"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Mood</label>
+                    <div class="mood-selector">
+                        <button type="button" class="mood-btn mood-amazing" onclick="selectMood('amazing')">Amazing</button>
+                        <button type="button" class="mood-btn mood-good" onclick="selectMood('good')">Good</button>
+                        <button type="button" class="mood-btn mood-neutral" onclick="selectMood('neutral')">Neutral</button>
+                        <button type="button" class="mood-btn mood-bad" onclick="selectMood('bad')">Bad</button>
+                        <button type="button" class="mood-btn mood-terrible" onclick="selectMood('terrible')">Terrible</button>
+                    </div>
+                    <input type="hidden" id="moodInput">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" id="saveButton" class="save-btn">Save Entry</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="entries-section">
+            <h3>Recent Entries</h3>
+            <div id="entriesList" class="entries-list">
+                <!-- Entries will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <!-- Include Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Include the Journal JS -->
+    <script src="{{ url_for('static', filename='js/journal.js') }}"></script>
+{% endblock %}

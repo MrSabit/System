@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+
+{% block title %}Daily Quest Settings - The Journey{% endblock %}
+
+{% block content %}
+<div class="content-container">
+    <div class="dashboard-header">
+        <h1>Daily Quest Settings</h1>
+        <div class="progress-bar">
+            <div class="progress" style="width: {{ progress_percentage }}%;"></div>
+        </div>
+        <div class="progress-text">Level {{ user.level }} - {{ user.xp }} XP</div>
+    </div>
+
+    <div class="settings-container">
+        <form method="POST" action="{{ url_for('journey.quest_settings') }}" class="settings-form" id="quest-settings-form">
+            <div class="settings-card">
+                <div class="settings-header">
+                    <h2>XP & Rewards</h2>
+                    <p>Configure how much XP you earn for completing quests</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="base_xp">Base XP for full completion:</label>
+                    <input type="number" id="base_xp" name="base_xp" value="{{ settings.base_xp }}" min="1" max="100">
+                    <p class="form-help">Default: 25 XP for completing all tasks in a day</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="skill_increase_min">Minimum skill improvement:</label>
+                    <input type="number" id="skill_increase_min" name="skill_increase_min" value="{{ settings.skill_increase_min }}" min="0.1" max="1.0" step="0.1">
+                    <p class="form-help">Minimum skill points received, even for partial completion (Default: 0.2)</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="skill_increase_max">Maximum skill improvement:</label>
+                    <input type="number" id="skill_increase_max" name="skill_increase_max" value="{{ settings.skill_increase_max }}" min="0.5" max="3.0" step="0.1">
+                    <p class="form-help">Maximum skill points received for full completion (Default: 1.0)</p>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="settings-header">
+                    <h2>Behavior</h2>
+                    <p>Configure how the daily quests system works</p>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="auto_submit" name="auto_submit" {% if settings.auto_submit %}checked{% endif %}>
+                    <label for="auto_submit">Automatically submit quests</label>
+                    <p class="form-help">If enabled, your progress will automatically be submitted when a new day starts</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="grace_period_hours">Grace period (hours):</label>
+                    <input type="number" id="grace_period_hours" name="grace_period_hours" value="{{ settings.grace_period_hours|default(12) }}" min="0" max="24" step="1">
+                    <p class="form-help">Hours to wait after a day ends before auto-submitting (Default: 12). This gives you time to complete tasks you forgot to check.</p>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="notification_enabled" name="notification_enabled" {% if settings.notification_enabled %}checked{% endif %}>
+                    <label for="notification_enabled">Show notifications</label>
+                    <p class="form-help">Show notifications when quests are automatically completed</p>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="settings-header">
+                    <h2>Notifications</h2>
+                    <p>Configure how notifications appear</p>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="notification_enabled" name="notification_enabled" {% if settings.notification_enabled %}checked{% endif %}>
+                    <label for="notification_enabled">Enable notifications</label>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="browser_notifications" name="browser_notifications">
+                    <label for="browser_notifications">Enable browser notifications</label>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="toast_notifications" name="toast_notifications">
+                    <label for="toast_notifications">Enable toast notifications</label>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="notification_animations" name="notification_animations">
+                    <label for="notification_animations">Enable notification animations</label>
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="notification_sounds" name="notification_sounds">
+                    <label for="notification_sounds">Enable notification sounds</label>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="settings-header">
+                    <h2>Custom Quest Management</h2>
+                    <p>Configure your own custom quests</p>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="custom_quests_enabled" name="custom_quests_enabled" {% if settings.custom_quests_enabled %}checked{% endif %}>
+                    <label for="custom_quests_enabled">Use custom quests</label>
+                    <p class="form-help">If enabled, you can specify your own daily quests file instead of the default one</p>
+                </div>
+
+                <div class="form-group" id="custom_quests_path_container" {% if not settings.custom_quests_enabled %}style="display: none;"{% endif %}>
+                    <label for="custom_quests_path">Custom quests file path:</label>
+                    <input type="text" id="custom_quests_path" name="custom_quests_path" value="{{ settings.custom_quests_path or '' }}" placeholder="app/my_custom_quests.md">
+                    <p class="form-help">Path to your custom quests file (must follow the same format as daily_quests.md)</p>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="settings-header">
+                    <h2>Edit Default Quests</h2>
+                    <p>Edit the content of the default daily quests file</p>
+                </div>
+
+                <div class="form-group">
+                    <p class="form-help">Edit the default quests directly. Follow the format: "## Day (Title)" followed by "- Task" for each task</p>
+                    <textarea id="quest_content" name="quest_content" rows="15" class="code-editor">{{ quest_content }}</textarea>
+                    <input type="hidden" id="normalized_quest_content" name="normalized_quest_content">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="settings-save-btn">Save Settings</button>
+                <a href="{{ url_for('journey.daily_quests') }}" class="settings-cancel-btn">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Flag to prevent duplicate event handlers
+    const settingsEventHandlersInitialized = window.settingsEventHandlersInitialized || false;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prevent duplicate event handlers
+        if (settingsEventHandlersInitialized) {
+            console.log("Settings event handlers already initialized, skipping...");
+            return;
+        }
+        window.settingsEventHandlersInitialized = true;
+        
+        // Toggle custom quests path visibility
+        const customQuestsCheckbox = document.getElementById('custom_quests_enabled');
+        const customQuestsPathField = document.getElementById('custom_quests_path_container');
+        
+        function toggleCustomQuestsPath() {
+            if (customQuestsCheckbox.checked) {
+                customQuestsPathField.style.display = 'block';
+            } else {
+                customQuestsPathField.style.display = 'none';
+            }
+        }
+        
+        // Initial state
+        toggleCustomQuestsPath();
+        
+        // Change listener
+        customQuestsCheckbox.addEventListener('change', toggleCustomQuestsPath);
+        
+        // Handle notification preference changes
+        const notificationPrefs = {
+            browser_notifications: document.getElementById('browser_notifications'),
+            toast_notifications: document.getElementById('toast_notifications'),
+            notification_animations: document.getElementById('notification_animations'),
+            notification_sounds: document.getElementById('notification_sounds')
+        };
+        
+        // Load stored notification preferences
+        if (window.journeyNotification) {
+            notificationPrefs.browser_notifications.checked = window.journeyNotification.settings.enableBrowserNotifications;
+            notificationPrefs.toast_notifications.checked = window.journeyNotification.settings.enableToastNotifications;
+            notificationPrefs.notification_animations.checked = window.journeyNotification.settings.enableAnimations;
+            notificationPrefs.notification_sounds.checked = window.journeyNotification.settings.enableSound;
+        }
+        
+        // Save notification preferences when changed - with debouncing to prevent multiple notifications
+        let notificationTimeout = null;
+        
+        // Function to save settings and show notification with debouncing
+        function saveNotificationSettings() {
+            if (window.journeyNotification) {
+                window.journeyNotification.saveSettings({
+                    enableBrowserNotifications: notificationPrefs.browser_notifications.checked,
+                    enableToastNotifications: notificationPrefs.toast_notifications.checked,
+                    enableAnimations: notificationPrefs.notification_animations.checked,
+                    enableSound: notificationPrefs.notification_sounds.checked
+                });
+                
+                // Clear any pending timeout
+                if (notificationTimeout) {
+                    clearTimeout(notificationTimeout);
+                }
+                
+                // Set a new timeout to show notification after a small delay
+                notificationTimeout = setTimeout(() => {
+                    // Test notification
+                    window.journeyNotification.notify({
+                        title: 'Notification Settings Updated',
+                        message: 'Your notification settings have been saved',
+                        type: 'success'
+                    });
+                    notificationTimeout = null;
+                }, 600);
+            }
+        }
+        
+        // Add event listener to each checkbox
+        Object.keys(notificationPrefs).forEach(key => {
+            notificationPrefs[key].addEventListener('change', saveNotificationSettings);
+        });
+        
+        // Fix line break handling in textarea
+        const form = document.getElementById('quest-settings-form');
+        const questContent = document.getElementById('quest_content');
+        const normalizedQuestContent = document.getElementById('normalized_quest_content');
+        
+        // Clean up textarea content when the form is submitted
+        form.addEventListener('submit', function(e) {
+            // Normalize the quest content by removing excessive line breaks
+            // This regex pattern finds multiple newlines and replaces them with a maximum of two
+            let content = questContent.value;
+            
+            // First, normalize all line ending types to \n
+            content = content.replace(/\r\n|\r/g, '\n');
+            
+            // Replace excessive newlines (more than 2 consecutive) with exactly 2 newlines
+            content = content.replace(/\n{3,}/g, '\n\n');
+            
+            // Update the normalized content hidden field
+            normalizedQuestContent.value = content;
+            
+            // Also update the textarea for visual consistency
+            questContent.value = content;
+        });
+        
+        // Clean up the textarea content when it first loads
+        let initialContent = questContent.value;
+        // Normalize line endings
+        initialContent = initialContent.replace(/\r\n|\r/g, '\n');
+        // Replace excessive newlines with max 2
+        initialContent = initialContent.replace(/\n{3,}/g, '\n\n');
+        // Update textarea with cleaner content
+        questContent.value = initialContent;
+    });
+</script>
+{% endblock %} 

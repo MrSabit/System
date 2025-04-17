@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Text Editor</title>
+    <script src="ckeditor.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #editor {
+            max-width: 800px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>MS Word Style Editor</h2>
+    <div id="editor">
+        <p>Start writing your notes here...</p>
+    </div>
+
+    <script>
+        ClassicEditor
+            .create(document.querySelector('#editor'), {
+                toolbar: [
+                    'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', '|',
+                    'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+                    'alignment', 'indent', 'outdent', '|',
+                    'highlight', 'specialCharacters', '|',
+                    'bulletedList', 'numberedList', 'blockQuote', '|',
+                    'insertTable', 'imageUpload', 'link', '|',
+                    'undo', 'redo'
+                ],
+                fontSize: {
+                    options: [10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72]
+                },
+                fontFamily: {
+                    options: ['default', 'Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana']
+                },
+                alignment: {
+                    options: ['left', 'center', 'right', 'justify']
+                },
+                table: {
+                    contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+                },
+                image: {
+                    toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
+                },
+                extraPlugins: [MyCustomUploadAdapterPlugin]
+            })
+            .then(editor => {
+                console.log("Editor is ready!");
+            })
+            .catch(error => {
+                console.error(error);
+            });
+
+        // Custom File Upload Adapter (Base64 Image Upload)
+        function MyCustomUploadAdapterPlugin(editor) {
+            editor.plugins.get('FileRepository').createUploadAdapter = (loader) => {
+                return {
+                    upload: () => {
+                        return loader.file
+                            .then(file => {
+                                return new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.readAsDataURL(file);
+                                    reader.onload = () => resolve({ default: reader.result });
+                                    reader.onerror = error => reject(error);
+                                });
+                            });
+                    }
+                };
+            };
+        }
+    </script>
+
+</body>
+</html>

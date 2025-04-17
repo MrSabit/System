@@ -1,0 +1,600 @@
+{% extends 'base.html' %}
+
+{% block title %}Missions - The Journey{% endblock %}
+
+{% block content %}
+<style>
+    /* Dark theme with red accents for missions */
+    .missions-page {
+        padding: 20px;
+    }
+    
+    .mission-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        position: relative;
+    }
+    
+    .mission-title {
+        font-size: 2.2rem;
+        position: relative;
+        display: inline-block;
+        color: #f8f8f8;
+        text-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+        margin-right: 20px;
+        font-weight: bold;
+    }
+    
+    .mission-title::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, #dc2626, transparent);
+        border-radius: 2px;
+    }
+    
+    .new-mission-btn {
+        background: linear-gradient(135deg, #dc2626, #991b1b);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4);
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .new-mission-btn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(220, 38, 38, 0.6);
+    }
+    
+    .new-mission-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: all 0.5s ease;
+    }
+    
+    .new-mission-btn:hover::before {
+        left: 100%;
+    }
+    
+    .mission-description {
+        font-size: 1.1rem;
+        color: #94a3b8;
+        max-width: 800px;
+        margin-bottom: 30px;
+        line-height: 1.5;
+    }
+    
+    .missions-container {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        margin-bottom: 50px;
+    }
+    
+    .mission-card {
+        position: relative;
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(17, 24, 39, 0.95));
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        border-left: 5px solid #dc2626;
+        transform: translateZ(0);
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    .mission-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), transparent);
+        z-index: 0;
+    }
+    
+    .mission-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(220, 38, 38, 0.4);
+    }
+    
+    .mission-card-content {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .mission-card-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: white;
+        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+    
+    .mission-card-description {
+        font-size: 1rem;
+        color: #e2e8f0;
+        margin-bottom: 20px;
+        line-height: 1.6;
+    }
+    
+    .mission-card-requirements {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 3px solid #dc2626;
+    }
+    
+    .mission-card-requirements h4 {
+        font-size: 1.1rem;
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #f8fafc;
+    }
+    
+    .mission-card-requirements p {
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.5;
+    }
+    
+    .mission-card-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .mission-card-reward {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: bold;
+        color: #fde047;
+        text-shadow: 0 0 5px rgba(253, 224, 71, 0.5);
+    }
+    
+    .mission-card-reward-value {
+        font-size: 1.3rem;
+    }
+    
+    .mission-card-duration {
+        color: #94a3b8;
+        font-size: 0.9rem;
+    }
+    
+    .mission-card-actions {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    .complete-mission-btn {
+        background: linear-gradient(135deg, #dc2626, #991b1b);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(220, 38, 38, 0.4);
+    }
+    
+    .complete-mission-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(220, 38, 38, 0.6);
+    }
+    
+    .mission-section {
+        margin-bottom: 40px;
+    }
+    
+    .mission-section-title {
+        font-size: 1.8rem;
+        margin-bottom: 20px;
+        position: relative;
+        display: inline-block;
+        color: #f8f8f8;
+        padding-bottom: 10px;
+    }
+    
+    .mission-section-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, #dc2626, transparent);
+        border-radius: 3px;
+    }
+    
+    .completed-mission-card {
+        opacity: 0.7;
+        border-left-color: #3b82f6;
+    }
+    
+    .completed-mission-card:hover {
+        opacity: 0.9;
+    }
+    
+    .mission-card-completed-date {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        margin-top: 10px;
+    }
+    
+    .mission-completed-badge {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 50px 20px;
+        text-align: center;
+        background: rgba(30, 41, 59, 0.5);
+        border-radius: 15px;
+        border: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        color: #475569;
+    }
+    
+    .empty-state-text {
+        font-size: 1.2rem;
+        color: #94a3b8;
+        margin-bottom: 25px;
+    }
+    
+    @media (max-width: 768px) {
+        .mission-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .mission-title {
+            margin-bottom: 25px;
+        }
+        
+        .mission-card-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+    }
+    
+    /* Loading spinner */
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 8px;
+        vertical-align: middle;
+        display: none;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Disabled button style */
+    .mission-action-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none !important;
+    }
+    
+    .requirements-label {
+        font-size: 1.1rem;
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #f8fafc;
+    }
+    
+    .requirements-content {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 3px solid #dc2626;
+        background: rgba(0, 0, 0, 0.3);
+    }
+    
+    .requirements-text {
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.5;
+    }
+    
+    .requirements-helper {
+        font-size: 0.9rem;
+        color: #94a3b8;
+        margin-top: 10px;
+    }
+    
+    .mission-requirements {
+        margin-bottom: 20px;
+    }
+    
+    .mission-requirements-title {
+        font-size: 1.1rem;
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #f8fafc;
+    }
+    
+    .mission-requirements-content {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 3px solid #dc2626;
+        background: rgba(0, 0, 0, 0.3);
+    }
+    
+    .mission-requirements-text {
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.5;
+    }
+</style>
+
+<div class="missions-page">
+    <div class="mission-header">
+        <div class="mission-title">Missions</div>
+        {% if not active_missions %}
+        <a href="{{ url_for('journey.create_mission') }}" class="new-mission-btn">+ Create New Mission</a>
+        {% endif %}
+    </div>
+    
+    <div class="mission-description">
+        Missions are the most challenging tasks on your journey, representing significant milestones that shape your development. Each completed mission rewards 500 XP, a substantial boost to your progress.
+        {% if active_missions %}
+        <div style="margin-top: 10px; color: #dc2626; font-weight: bold;">You must complete your current mission before creating a new one.</div>
+        {% endif %}
+    </div>
+    
+    <!-- Active Missions Section -->
+    <div class="mission-section">
+        <div class="mission-section-title">Active Missions</div>
+        
+        <div class="missions-container">
+            {% if active_missions %}
+                {% for mission in active_missions %}
+                <div class="mission-card">
+                    <div class="mission-header">ACTIVE MISSION <span style="opacity: 0.6;">// {{ mission.difficulty|upper }}</span></div>
+                    
+                    <div class="mission-details">
+                        <div class="mission-title">{{ mission.title }}</div>
+                        
+                        <div class="mission-description" style="white-space: pre-wrap;">{{ mission.description }}</div>
+
+                        {% if mission.requirements %}
+                        <div class="mission-requirements">
+                            <div class="mission-requirements-title">Completion Requirements</div>
+                            <div class="mission-requirements-text" style="white-space: pre-wrap;">{{ mission.requirements|safe }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        
+                        <div class="mission-footer">
+                            <div class="mission-meta">
+                                <div class="mission-reward">
+                                    REWARD: <span class="mission-reward-value">500 XP</span>
+                                </div>
+                                
+                                {% if mission.estimated_duration %}
+                                <div class="mission-duration">
+                                    ESTIMATED TIME: {{ mission.estimated_duration }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mission-actions">
+                                <a href="{{ url_for('journey.missions') }}" class="mission-action-btn">DETAILS</a>
+                                {% if user.level >= 7 %}
+                                <form action="{{ url_for('journey.complete_mission', id=mission.id) }}" method="post" style="display: inline-block;" class="mission-form" id="complete-mission-{{ mission.id }}">
+                                    <button type="submit" class="mission-action-btn mission-complete-btn" data-mission-id="{{ mission.id }}">
+                                        <span class="loading-spinner" id="complete-spinner-{{ mission.id }}"></span>
+                                        <span>COMPLETE</span>
+                                    </button>
+                                </form>
+                                <form action="{{ url_for('journey.fail_mission', id=mission.id) }}" method="post" style="display: inline-block;" class="mission-form" id="fail-mission-{{ mission.id }}">
+                                    <button type="submit" class="mission-action-btn mission-fail-btn" style="background: linear-gradient(135deg, #dc2626, #991b1b);" 
+                                        data-mission-id="{{ mission.id }}"
+                                        onclick="return confirm('Are you sure you want to mark this mission as failed? This will apply a 60% XP penalty for 9 days and delete the mission.')">
+                                        <span class="loading-spinner" id="fail-spinner-{{ mission.id }}"></span>
+                                        <span>FAIL</span>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button type="button" class="mission-action-btn" style="opacity: 0.5; cursor: not-allowed;" title="Requires Level 7+">COMPLETE</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">🏆</div>
+                    <div class="empty-state-text">You have no active missions. Create one to start your epic journey!</div>
+                    {% if not active_missions %}
+                    <a href="{{ url_for('journey.create_mission') }}" class="new-mission-btn">+ Create New Mission</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Completed Missions Section -->
+    <div class="mission-section">
+        <div class="mission-section-title">Completed Missions</div>
+        
+        <div class="missions-container">
+            {% if completed_missions %}
+                {% for mission in completed_missions %}
+                <div class="mission-card completed-mission-card">
+                    <div class="mission-completed-badge">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/>
+                        </svg>
+                        <span>Completed</span>
+                    </div>
+                    
+                    <div class="mission-card-content">
+                        <h3 class="mission-card-title">{{ mission.title }}</h3>
+                        <div class="mission-card-description" style="white-space: pre-wrap;">{{ mission.description }}</div>
+                        
+                        {% if mission.requirements %}
+                        <div class="mission-card-requirements">
+                            <h4>Requirements Met</h4>
+                            <p style="white-space: pre-wrap;">{{ mission.requirements }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mission-card-meta">
+                            <div class="mission-card-reward">
+                                <span>EARNED:</span>
+                                <span class="mission-card-reward-value">500 XP</span>
+                            </div>
+                            
+                            <div class="mission-card-completed-date">
+                                Completed on {{ mission.completed_at.strftime('%B %d, %Y') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">🎯</div>
+                    <div class="empty-state-text">You haven't completed any missions yet. Complete your active missions to see them here!</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/mission_effects.js') }}"></script>
+<script>
+    // Flag to prevent duplicate event handlers
+    const missionsPageInitialized = window.missionsPageInitialized || false;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prevent duplicate event handlers
+        if (missionsPageInitialized) {
+            console.log("Missions page handlers already initialized, skipping...");
+            return;
+        }
+        window.missionsPageInitialized = true;
+        
+        // Track form submission status
+        const submittingForms = new Set();
+        
+        // Handle mission complete/fail forms
+        document.querySelectorAll('.mission-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                // Get the form ID to track submission
+                const formId = this.id;
+                
+                // If already submitting, prevent duplicate submission
+                if (submittingForms.has(formId)) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // Mark as submitting
+                submittingForms.add(formId);
+                
+                // Update button state
+                const submitBtn = this.querySelector('button[type="submit"]');
+                const spinner = submitBtn.querySelector('.loading-spinner');
+                
+                if (submitBtn && spinner) {
+                    // Disable button
+                    submitBtn.disabled = true;
+                    submitBtn.style.opacity = '0.7';
+                    
+                    // Show spinner
+                    spinner.style.display = 'inline-block';
+                }
+                
+                // Allow form submission to continue
+                return true;
+            });
+        });
+        
+        // Handle mission API notifications when coming back to this page
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('mission_completed') && urlParams.get('mission_completed') === 'true') {
+            // Remove the parameter to prevent duplicate notifications on refresh
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+            
+            // We don't need to display a notification since it's handled by the server
+        }
+        
+        // Initialize mission effects
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if mission mode is active
+            const missionModeActive = document.body.getAttribute('data-mission-active') === 'true';
+            if (missionModeActive) {
+                // Apply mission effects immediately
+                applyMissionEffects();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}The Journal{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/journal.css') }}">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Include CKEditor from local path -->
+    <script src="{{ url_for('static', filename='js/ckeditor/ckeditor.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="journal-container">
+    <div class="journal-header">
+        <h1>The Journal</h1>
+        <p class="journal-subtitle">Record your thoughts, ideas, and progress.</p>
+    </div>
+
+    <div class="journal-content">
+        <!-- Calendar Section -->
+        <div class="calendar-section">
+            <div class="calendar-header">
+                <button id="prevMonth" class="calendar-nav-btn"><i class="fas fa-chevron-left"></i></button>
+                <h2 id="monthYearDisplay">April 2025</h2>
+                <button id="nextMonth" class="calendar-nav-btn"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="calendar-weekdays">
+                <div>Sun</div>
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+            </div>
+            <div id="calendarDays" class="calendar-days">
+                <!-- Days will be inserted here via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Editor Section -->
+        <div class="editor-section">
+            <div class="editor-header">
+                <div class="date-navigation">
+                    <button id="prevDayBtn" class="day-nav-btn" title="Previous Day">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <h3>Note for <span id="selectedDate">Today</span></h3>
+                    <button id="nextDayBtn" class="day-nav-btn" title="Next Day">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="editor-actions">
+                    <button id="readModeBtn" class="action-btn primary-btn" title="Toggle Read Mode">
+                        <i class="fas fa-book-reader"></i> <span class="btn-text">Read Mode</span>
+                    </button>
+                    <button id="exportPDF" class="action-btn" title="Export as PDF">
+                        <i class="fas fa-file-pdf"></i> <span class="btn-text">PDF</span>
+                    </button>
+                    <button id="exportDOCX" class="action-btn" title="Export as DOCX">
+                        <i class="fas fa-file-word"></i> <span class="btn-text">DOCX</span>
+                    </button>
+                </div>
+            </div>
+            <input type="text" id="noteTitle" class="note-title" placeholder="Enter title here..." autocomplete="off">
+            <div id="editor">
+                <p></p>
+            </div>
+            <div class="save-status" id="saveStatus">
+                <span>Auto-saved</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Read Mode Overlay -->
+<div id="readModeOverlay" class="read-mode-overlay">
+    <div class="read-mode-container">
+        <div class="read-mode-header">
+            <div class="read-mode-title-section">
+                <h2 id="readModeTitle">Note Title</h2>
+                <div class="read-mode-date" id="readModeDate">Date</div>
+            </div>
+            <div class="read-mode-controls">
+                <button id="readModePrevDay" class="read-mode-day-btn" title="Previous Day's Journal">
+                    <i class="fas fa-arrow-left"></i> <span class="btn-text">Previous Day</span>
+                </button>
+                <button id="readModeNextDay" class="read-mode-day-btn" title="Next Day's Journal">
+                    <span class="btn-text">Next Day</span> <i class="fas fa-arrow-right"></i>
+                </button>
+                <button id="closeReadMode" class="close-btn" title="Close Read Mode">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="read-mode-content" id="readModeContent">
+            <!-- Content will be loaded here -->
+        </div>
+        <div class="read-mode-footer">
+            <div class="page-indicator">
+                <span id="currentPage">1</span> / <span id="totalPages">1</span>
+            </div>
+            <div class="navigation-controls">
+                <button id="prevPage" class="nav-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button id="nextPage" class="nav-btn" disabled>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <!-- Include Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Include the Journal JS -->
+    <script src="{{ url_for('static', filename='js/the-journal.js') }}"></script>
+    <!-- Initialize CKEditor -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof CKEDITOR !== 'undefined') {
+                CKEDITOR.replace('editor', {
+                    height: 400,
+                    removePlugins: 'elementspath',
+                    resize_enabled: false,
+                    toolbar: [
+                        { name: 'styles', items: ['Format', 'Font', 'FontSize'] },
+                        { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike', '-', 'RemoveFormat'] },
+                        { name: 'paragraph', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'Blockquote'] },
+                        { name: 'links', items: ['Link', 'Unlink'] },
+                        { name: 'insert', items: ['Image', 'Table', 'HorizontalRule', 'SpecialChar'] },
+                        { name: 'tools', items: ['Maximize'] },
+                        { name: 'document', items: ['Source'] }
+                    ]
+                });
+            } else {
+                console.error('CKEditor not loaded');
+            }
+        });
+    </script>
+{% endblock %}

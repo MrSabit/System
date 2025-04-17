@@ -1,0 +1,656 @@
+// The Journal - Main JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('The Journal script loaded');
+    
+    // Initialize variables
+    let currentDate = new Date();
+    let currentMonth = currentDate.getMonth();
+    let currentYear = currentDate.getFullYear();
+    let selectedDate = new Date();
+    let notesData = {};
+    let editor;
+    let saveTimeout = null;
+    
+    // Initialize the calendar
+    renderCalendar(currentMonth, currentYear);
+    
+    // Initialize CKEditor
+    ClassicEditor
+        .create(document.querySelector('#editor'), {
+            toolbar: [
+                'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', '|',
+                'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+                'alignment', 'indent', 'outdent', '|',
+                'highlight', 'specialCharacters', '|',
+                'bulletedList', 'numberedList', 'blockQuote', '|',
+                'insertTable', 'imageUpload', 'link', '|',
+                'undo', 'redo'
+            ],
+            fontSize: {
+                options: [10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48]
+            },
+            fontFamily: {
+                options: ['default', 'Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana']
+            },
+            alignment: {
+                options: ['left', 'center', 'right', 'justify']
+            },
+            table: {
+                contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+            },
+            image: {
+                toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
+            },
+            placeholder: 'Start writing your note here...',
+            extraPlugins: [MyCustomUploadAdapterPlugin]
+        })
+        .then(newEditor => {
+            editor = newEditor;
+            
+            // Set up auto-save for editor content changes
+            editor.model.document.on('change:data', () => {
+                triggerAutoSave();
+            });
+            
+            // Load initial note for today
+            loadNoteForDate(formatDateForAPI(selectedDate));
+        })
+        .catch(error => {
+            console.error('Error initializing CKEditor:', error);
+        });
+    
+    // Event listeners for calendar navigation
+    document.getElementById('prevMonth').addEventListener('click', () => {
+        navigateMonth(-1);
+    });
+    
+    document.getElementById('nextMonth').addEventListener('click', () => {
+        navigateMonth(1);
+    });
+    
+    // Event listeners for year navigation
+    document.getElementById('prevYear').addEventListener('click', () => {
+        navigateYear(-1);
+    });
+    
+    document.getElementById('nextYear').addEventListener('click', () => {
+        navigateYear(1);
+    });
+    
+    document.getElementById('jumpToYearBtn').addEventListener('click', showYearSelector);
+    
+    // Event listener for note title changes
+    document.getElementById('noteTitle').addEventListener('input', () => {
+        triggerAutoSave();
+    });
+    
+    // Event listeners for day navigation and read mode buttons
+    document.getElementById('prevDayBtn').addEventListener('click', navigateToPreviousDay);
+    document.getElementById('nextDayBtn').addEventListener('click', navigateToNextDay);
+    document.getElementById('readModeBtn').addEventListener('click', toggleReadMode);
+    document.getElementById('closeReadMode').addEventListener('click', closeReadMode);
+    document.getElementById('readModePrevDay').addEventListener('click', readModeNavigateToPreviousDay);
+    document.getElementById('readModeNextDay').addEventListener('click', readModeNavigateToNextDay);
+    document.getElementById('prevPage').addEventListener('click', navigateToPrevPage);
+    document.getElementById('nextPage').addEventListener('click', navigateToNextPage);
+    
+    // Function to render the calendar
+    function renderCalendar(month, year) {
+        const calendarDays = document.getElementById('calendarDays');
+        calendarDays.innerHTML = '';
+        
+        // Update month/year display
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+        document.getElementById('monthYearDisplay').textContent = `${monthNames[month]} ${year}`;
+        
+        // Get first day of the month and total days
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Get previous month's last days
+        const prevMonthDays = new Date(year, month, 0).getDate();
+        
+        // Create calendar grid
+        let dayCount = 1;
+        let nextMonthDay = 1;
+        
+        // Load notes data for this month
+        fetchMonthNotes(year, month);
+        
+        // Generate 6 weeks (42 days) to ensure a complete calendar
+        for (let i = 0; i < 42; i++) {
+            const dayElement = document.createElement('div');
+            dayElement.classList.add('calendar-day');
+            
+            // Previous month days
+            if (i < firstDay) {
+                const prevDay = prevMonthDays - firstDay + i + 1;
+                dayElement.textContent = prevDay;
+                dayElement.classList.add('other-month');
+                calendarDays.appendChild(dayElement);
+                continue;
+            }
+            
+            // Current month days
+            if (dayCount <= daysInMonth) {
+                dayElement.textContent = dayCount;
+                
+                // Check if it's today
+                const today = new Date();
+                if (dayCount === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                    dayElement.classList.add('today');
+                }
+                
+                // Check if it's selected date
+                if (dayCount === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear()) {
+                    dayElement.classList.add('selected');
+                }
+                
+                // Add click event
+                const clickDate = new Date(year, month, dayCount);
+                dayElement.addEventListener('click', () => selectDate(clickDate));
+                
+                // Check if day has a note
+                const dateKey = formatDateForAPI(new Date(year, month, dayCount));
+                if (notesData[dateKey]) {
+                    dayElement.classList.add('has-note');
+                }
+                
+                calendarDays.appendChild(dayElement);
+                dayCount++;
+            } 
+            // Next month days
+            else {
+                dayElement.textContent = nextMonthDay;
+                dayElement.classList.add('other-month');
+                calendarDays.appendChild(dayElement);
+                nextMonthDay++;
+            }
+        }
+    }
+    
+    // Function to navigate between months
+    function navigateMonth(direction) {
+        currentMonth += direction;
+        
+        if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+        } else if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+        }
+        
+        renderCalendar(currentMonth, currentYear);
+        fetchMonthNotes(currentYear, currentMonth);
+    }
+    
+    // Function to navigate between years
+    function navigateYear(direction) {
+        currentYear += direction;
+        renderCalendar(currentMonth, currentYear);
+        fetchMonthNotes(currentYear, currentMonth);
+        
+        // Add animation effect
+        const monthYearDisplay = document.getElementById('monthYearDisplay');
+        monthYearDisplay.classList.add('year-change-animation');
+        setTimeout(() => {
+            monthYearDisplay.classList.remove('year-change-animation');
+        }, 500);
+    }
+    
+    // Function to show year selector dialog
+    function showYearSelector() {
+        // Create a simple dialog for year selection
+        const currentYearNum = currentYear;
+        const yearInput = prompt('Enter year (1900-2100):', currentYearNum);
+        
+        if (yearInput !== null) {
+            const year = parseInt(yearInput);
+            if (!isNaN(year) && year >= 1900 && year <= 2100) {
+                // Valid year input
+                currentYear = year;
+                renderCalendar(currentMonth, currentYear);
+                fetchMonthNotes(currentYear, currentMonth);
+            } else {
+                // Invalid year input
+                alert('Please enter a valid year between 1900 and 2100.');
+            }
+        }
+    }
+    
+    // Function to select a date
+    function selectDate(date) {
+        selectedDate = date;
+        
+        // Update calendar UI
+        const allDays = document.querySelectorAll('.calendar-day');
+        allDays.forEach(day => {
+            day.classList.remove('selected');
+            if (!day.classList.contains('other-month') && 
+                parseInt(day.textContent) === date.getDate() && 
+                currentMonth === date.getMonth() && 
+                currentYear === date.getFullYear()) {
+                day.classList.add('selected');
+            }
+        });
+        
+        // Update selected date display
+        updateSelectedDateDisplay();
+        
+        // Update day navigation buttons
+        updateDayNavigationButtons();
+        
+        // Load note for the selected date
+        loadNoteForDate(formatDateForAPI(date));
+    }
+    
+    // Function to update the selected date display
+    function updateSelectedDateDisplay() {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('selectedDate').textContent = selectedDate.toLocaleDateString('en-US', options);
+    }
+    
+    // Function to navigate to the previous day
+    function navigateToPreviousDay() {
+        const prevDay = new Date(selectedDate);
+        prevDay.setDate(prevDay.getDate() - 1);
+        
+        // If we need to change month in the calendar view
+        if (prevDay.getMonth() !== currentMonth || prevDay.getFullYear() !== currentYear) {
+            currentMonth = prevDay.getMonth();
+            currentYear = prevDay.getFullYear();
+            renderCalendar(currentMonth, currentYear);
+        }
+        
+        selectDate(prevDay);
+        
+        // Add animation effect
+        addSlideAnimation('right');
+    }
+    
+    // Function to navigate to the next day
+    function navigateToNextDay() {
+        const nextDay = new Date(selectedDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        
+        // If we need to change month in the calendar view
+        if (nextDay.getMonth() !== currentMonth || nextDay.getFullYear() !== currentYear) {
+            currentMonth = nextDay.getMonth();
+            currentYear = nextDay.getFullYear();
+            renderCalendar(currentMonth, currentYear);
+        }
+        
+        selectDate(nextDay);
+        
+        // Add animation effect
+        addSlideAnimation('left');
+    }
+    
+    // Function to update day navigation buttons
+    function updateDayNavigationButtons() {
+        // Currently we don't disable any day navigation buttons
+        // as users can navigate to any past or future date
+        // But this function can be used if we want to add restrictions later
+    }
+    
+    // Function to add slide animation when changing days
+    function addSlideAnimation(direction) {
+        const editorSection = document.querySelector('.editor-section');
+        
+        // Add animation class
+        editorSection.classList.add(`slide-${direction}`);
+        
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            editorSection.classList.remove(`slide-${direction}`);
+        }, 500);
+    }
+    
+    // Read mode day navigation functions
+    function readModeNavigateToPreviousDay() {
+        // Find the previous day with a saved note
+        findPreviousNoteDay(selectedDate)
+            .then(prevDay => {
+                if (prevDay) {
+                    // Add transition effect
+                    addReadModeTransition('right');
+                    
+                    // Load the previous day's content directly in read mode
+                    loadDayInReadMode(prevDay);
+                } else {
+                    // No previous note found
+                    showNotification('No earlier journal entries found.', 'info');
+                }
+            })
+            .catch(error => {
+                console.error('Error finding previous note:', error);
+            });
+    }
+    
+    function readModeNavigateToNextDay() {
+        // Find the next day with a saved note
+        findNextNoteDay(selectedDate)
+            .then(nextDay => {
+                if (nextDay) {
+                    // Add transition effect
+                    addReadModeTransition('left');
+                    
+                    // Load the next day's content directly in read mode
+                    loadDayInReadMode(nextDay);
+                } else {
+                    // No next note found
+                    showNotification('No later journal entries found.', 'info');
+                }
+            })
+            .catch(error => {
+                console.error('Error finding next note:', error);
+            });
+    }
+    
+    // Function to load a specific day's content directly in read mode
+    function loadDayInReadMode(date) {
+        // Update the selected date (this will be used when exiting read mode)
+        selectedDate = date;
+        
+        // Update calendar if needed (for when we exit read mode)
+        if (date.getMonth() !== currentMonth || date.getFullYear() !== currentYear) {
+            currentMonth = date.getMonth();
+            currentYear = date.getFullYear();
+            renderCalendar(currentMonth, currentYear);
+        }
+        
+        // Format date for display
+        const formattedDate = date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        // Update the date display in read mode
+        document.getElementById('readModeDate').textContent = formattedDate;
+        
+        // Fetch the note for this date
+        fetch(`/journal/api/note?date=${formatDateForAPI(date)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the title
+                    const noteTitle = data.note.title || 'Untitled Note';
+                    document.getElementById('readModeTitle').textContent = noteTitle;
+                    
+                    // Process content into pages
+                    processContentIntoPages(data.note.content || '');
+                    
+                    // Show the first page
+                    showPage(1);
+                } else {
+                    // If no note exists for this date, show empty state
+                    document.getElementById('readModeTitle').textContent = 'No Entry';
+                    processContentIntoPages('<p>No journal entry for this date.</p>');
+                    showPage(1);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching note:', error);
+                document.getElementById('readModeTitle').textContent = 'Error';
+                processContentIntoPages('<p>Error loading journal entry.</p>');
+                showPage(1);
+            });
+    }
+    
+    // Function to add transition effect when changing days in read mode
+    function addReadModeTransition(direction) {
+        const contentElement = document.getElementById('readModeContent');
+        const titleElement = document.getElementById('readModeTitle');
+        const dateElement = document.getElementById('readModeDate');
+        
+        // Add transition classes
+        contentElement.classList.add(`slide-out-${direction}`);
+        titleElement.classList.add('fade-out');
+        dateElement.classList.add('fade-out');
+        
+        // Remove transition classes after animation completes
+        setTimeout(() => {
+            contentElement.classList.remove(`slide-out-${direction}`);
+            contentElement.classList.add(`slide-in-${direction === 'left' ? 'right' : 'left'}`);
+            titleElement.classList.remove('fade-out');
+            titleElement.classList.add('fade-in');
+            dateElement.classList.remove('fade-out');
+            dateElement.classList.add('fade-in');
+            
+            // Remove the incoming animation classes after they complete
+            setTimeout(() => {
+                contentElement.classList.remove(`slide-in-${direction === 'left' ? 'right' : 'left'}`);
+                titleElement.classList.remove('fade-in');
+                dateElement.classList.remove('fade-in');
+            }, 500);
+        }, 300);
+    }
+    
+    // Format date for API calls (YYYY-MM-DD)
+    function formatDateForAPI(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    // Function to fetch notes for the entire month
+    function fetchMonthNotes(year, month) {
+        fetch('/journal/api/notes-by-month?year=' + year + '&month=' + (month + 1))
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the notesData object
+                    notesData = {};
+                    data.notes.forEach(note => {
+                        notesData[note.date] = note;
+                    });
+                    
+                    // Update calendar to show which days have notes
+                    updateCalendarNoteIndicators();
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching month notes:', error);
+            });
+    }
+    
+    // Update calendar to show which days have notes
+    function updateCalendarNoteIndicators() {
+        const calendarDays = document.querySelectorAll('.calendar-day:not(.other-month)');
+        
+        calendarDays.forEach(dayElement => {
+            const day = parseInt(dayElement.textContent);
+            const dateKey = formatDateForAPI(new Date(currentYear, currentMonth, day));
+            
+            if (notesData[dateKey]) {
+                dayElement.classList.add('has-note');
+            } else {
+                dayElement.classList.remove('has-note');
+            }
+        });
+    }
+    
+    // Function to load a note for a specific date
+    function loadNoteForDate(dateStr) {
+        fetch(`/journal/api/note?date=${dateStr}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.note) {
+                    document.getElementById('noteTitle').value = data.note.title || '';
+                    editor.setData(data.note.content || '');
+                } else {
+                    // No note found for this date, clear the editor completely
+                    document.getElementById('noteTitle').value = '';
+                    editor.setData(''); // This should trigger the placeholder
+                    
+                    // Make sure the editor is truly empty to show placeholder
+                    const editorElement = editor.sourceElement;
+                    }
+                }
+                
+                // Update save status
+                document.getElementById('saveStatus').innerHTML = '<span>Loaded</span>';
+                setTimeout(() => {
+                    document.getElementById('saveStatus').innerHTML = '<span>Ready</span>';
+                }, 1500);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading note:', error);
+        });
+}
+
+// Custom File Upload Adapter (Base64 Image Upload)
+function MyCustomUploadAdapterPlugin(editor) {
+    editor.plugins.get('FileRepository').createUploadAdapter = (loader) => {
+        return {
+            upload: () => {
+                return loader.file
+                    .then(file => {
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.readAsDataURL(file);
+                            reader.onload = () => resolve({ default: reader.result });
+                            reader.onerror = error => reject(error);
+                        });
+                    });
+            }
+        };
+    };
+}
+    // Handle keyboard navigation in read mode
+    function handleReadModeKeyboardNavigation(event) {
+        // Only process keyboard events when read mode is active
+        const overlay = document.getElementById('readModeOverlay');
+        if (overlay.style.display !== 'flex' || !overlay.classList.contains('active')) {
+            return;
+        }
+        
+        switch(event.key) {
+            case 'ArrowLeft':
+                // Previous day
+                readModeNavigateToPreviousDay();
+                event.preventDefault();
+                break;
+                
+            case 'ArrowRight':
+                // Next day
+                readModeNavigateToNextDay();
+                event.preventDefault();
+                break;
+                
+            case 'ArrowUp':
+                // Previous page (if multi-page content)
+                if (currentPage > 1) {
+                    navigateToPrevPage();
+                    event.preventDefault();
+                }
+                break;
+                
+            case 'ArrowDown':
+                // Next page (if multi-page content)
+                if (currentPage < readModeContent.length) {
+                    navigateToNextPage();
+                    event.preventDefault();
+                }
+                break;
+                
+            case 'Escape':
+                // Close read mode
+                closeReadMode();
+                event.preventDefault();
+                break;
+        }
+    }
+    
+    // Function to find the previous day with a saved note
+    function findPreviousNoteDay(currentDate) {
+        return new Promise((resolve, reject) => {
+            // Start from the day before the current date
+            const startDate = new Date(currentDate);
+            startDate.setDate(startDate.getDate() - 1);
+            
+            // Format the start date for API
+            const startDateStr = formatDateForAPI(startDate);
+            
+            // Call API to find previous note
+            fetch(`/journal/api/find-previous-note?date=${startDateStr}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.date) {
+                        // Convert the returned date string to a Date object
+                        const [year, month, day] = data.date.split('-').map(Number);
+                        resolve(new Date(year, month - 1, day)); // month is 0-indexed in JS Date
+                    } else {
+                        resolve(null); // No previous note found
+                    }
+                })
+                .catch(error => {
+                    console.error('Error finding previous note:', error);
+                    reject(error);
+                });
+        });
+    }
+    
+    // Function to find the next day with a saved note
+    function findNextNoteDay(currentDate) {
+        return new Promise((resolve, reject) => {
+            // Start from the day after the current date
+            const startDate = new Date(currentDate);
+            startDate.setDate(startDate.getDate() + 1);
+            
+            // Format the start date for API
+            const startDateStr = formatDateForAPI(startDate);
+            
+            // Call API to find next note
+            fetch(`/journal/api/find-next-note?date=${startDateStr}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.date) {
+                        // Convert the returned date string to a Date object
+                        const [year, month, day] = data.date.split('-').map(Number);
+                        resolve(new Date(year, month - 1, day)); // month is 0-indexed in JS Date
+                    } else {
+                        resolve(null); // No next note found
+                    }
+                })
+                .catch(error => {
+                    console.error('Error finding next note:', error);
+                    reject(error);
+                });
+        });
+    }
+    
+    // Function to show notification
+    function showNotification(message, type = 'info') {
+        // Create notification element if it doesn't exist
+        let notification = document.getElementById('journalNotification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'journalNotification';
+            notification.className = 'journal-notification';
+            document.body.appendChild(notification);
+        }
+        
+        // Set notification content and type
+        notification.textContent = message;
+        notification.className = `journal-notification ${type}`;
+        
+        // Show notification
+        notification.classList.add('show');
+        
+        // Hide notification after 3 seconds
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+    
+    // Initialize the page
+    updateSelectedDateDisplay();
+    updateDayNavigationButtons();
+});

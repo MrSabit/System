@@ -1,0 +1,680 @@
+{% extends 'base.html' %}
+
+{% block title %}Objectives - The Journey{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <!-- Objectives Container -->
+    <div class="objectives-container">
+        <!-- Header Section -->
+        <div class="objectives-header">
+            <h1>Your Objectives</h1>
+            <a href="{{ url_for('journey.create_objective') }}" class="btn-new-objective">
+                <span class="btn-icon">+</span>
+                <span class="btn-text">New Objective</span>
+            </a>
+        </div>
+
+        {% if objectives %}
+            <!-- Active Objective -->
+            <div class="objectives-section active-section">
+                {% for objective in objectives %}
+                    {% if objective.is_active %}
+                        <div class="active-objective-card">
+                            <div class="active-badge">ACTIVE</div>
+                            <h2 class="objective-title">{{ objective.title }}</h2>
+                            
+                            <div class="objective-details">
+                                <div class="objective-difficulty">
+                                    <span class="difficulty-label">DIFFICULTY</span>
+                                    <span class="difficulty-value difficulty-{{ objective.difficulty }}">
+                                        {{ objective.difficulty|capitalize }}
+                                    </span>
+                                </div>
+                                <div class="objective-xp">
+                                    <span class="xp-value">
+                                        {% if objective.difficulty == 'easy' %}50
+                                        {% elif objective.difficulty == 'hard' %}150
+                                        {% elif objective.difficulty == 'extreme' %}200
+                                        {% else %}100{% endif %} XP
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            {% if objective.description %}
+                            <div class="description-container">
+                                <button type="button" class="description-toggle" onclick="toggleDescription(this)">
+                                    <span class="toggle-icon">+</span> View Details
+                                </button>
+                                <div class="objective-description-dropdown">
+                                    <p class="objective-description" style="white-space: pre-wrap;">{{ objective.description }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="objective-actions">
+                                <form action="{{ url_for('journey.complete_objective', id=objective.id) }}" method="post">
+                                    <button type="submit" class="btn-complete">Complete</button>
+                                </form>
+                                <form action="{{ url_for('journey.fail_objective', id=objective.id) }}" method="post">
+                                    <button type="submit" class="btn-fail" 
+                                        data-penalty-days="{% if objective.difficulty == 'easy' %}3{% elif objective.difficulty == 'hard' %}7{% elif objective.difficulty == 'extreme' %}9{% else %}5{% endif %}"
+                                        onclick="return confirmPenalty(this)">
+                                        Fail
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            
+            <!-- Other Objectives -->
+            <div class="objectives-section other-section">
+                <h2 class="section-title">Other Objectives</h2>
+                
+                <div class="objectives-grid">
+                    {% for objective in objectives %}
+                        {% if not objective.is_active and not objective.completed_at %}
+                            <div class="objective-card">
+                                <div class="card-content">
+                                    <h3 class="objective-title">{{ objective.title }}</h3>
+                                    <div class="objective-difficulty difficulty-{{ objective.difficulty }}">
+                                        {{ objective.difficulty|capitalize }}
+                                    </div>
+                                    {% if objective.description %}
+                                        <div class="description-container">
+                                            <button type="button" class="description-toggle card-toggle" onclick="toggleDescription(this)">
+                                                <span class="toggle-icon">+</span> View Details
+                                            </button>
+                                            <div class="objective-description-dropdown">
+                                                <p class="objective-description">{{ objective.description }}</p>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="card-actions">
+                                    <form action="{{ url_for('journey.activate_objective', id=objective.id) }}" method="post">
+                                        <button type="submit" class="btn-activate">Set Active</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Completed Objectives -->
+            <div class="objectives-section completed-section">
+                <h2 class="section-title">Completed Objectives</h2>
+                
+                <div class="objectives-grid">
+                    {% if completed_count > 0 %}
+                        {% for objective in objectives %}
+                            {% if objective.completed_at %}
+                                <div class="objective-card completed">
+                                    <div class="card-content">
+                                        <h3 class="objective-title">{{ objective.title }}</h3>
+                                        <div class="objective-difficulty difficulty-{{ objective.difficulty }}">
+                                            {{ objective.difficulty|capitalize }}
+                                        </div>
+                                        {% if objective.description %}
+                                            <p class="objective-description">{{ objective.description }}</p>
+                                        {% endif %}
+                                        <div class="completion-date">
+                                            Completed: {{ objective.completed_at.strftime('%b %d, %Y') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <p>No completed objectives yet. Keep working towards your goals!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-objectives">
+                <div class="empty-content">
+                    <p>You don't have any objectives yet. Create your first objective to start tracking your journey!</p>
+                    <a href="{{ url_for('journey.create_objective') }}" class="btn-create-first">Create First Objective</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+/* Modern Objectives Page Styles */
+.dashboard-content {
+    padding: 2rem;
+}
+
+.objectives-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* Header Styles */
+.objectives-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2.5rem;
+}
+
+.objectives-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0;
+}
+
+.btn-new-objective {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+}
+
+.btn-new-objective:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(37, 99, 235, 0.3);
+}
+
+.btn-icon {
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+/* Section Styles */
+.objectives-section {
+    margin-bottom: 3rem;
+}
+
+.section-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 1.5rem;
+    position: relative;
+    padding-bottom: 0.8rem;
+}
+
+.section-title:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 3rem;
+    height: 3px;
+    background: linear-gradient(to right, #3b82f6, rgba(59, 130, 246, 0.2));
+    border-radius: 3px;
+}
+
+/* Active Objective Card */
+.active-objective-card {
+    background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(31, 41, 55, 0.8));
+    border-radius: 1.2rem;
+    padding: 2.5rem;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    transition: all 0.3s ease;
+    margin-bottom: 3rem;
+}
+
+.active-objective-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.active-objective-card:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 150px;
+    height: 150px;
+    background: radial-gradient(circle at center, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
+    z-index: 0;
+}
+
+.active-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 0.3rem;
+    margin-bottom: 1.2rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    box-shadow: 0 2px 5px rgba(37, 99, 235, 0.3);
+}
+
+.active-objective-card .objective-title {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.objective-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.objective-difficulty {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.difficulty-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.difficulty-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.25rem 0.7rem;
+    border-radius: 0.25rem;
+    display: inline-block;
+}
+
+.difficulty-easy {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.difficulty-medium {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.difficulty-hard {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.difficulty-extreme {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.objective-xp {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #a5b4fc;
+    display: flex;
+    align-items: center;
+}
+
+.objective-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.btn-complete, .btn-fail, .btn-activate {
+    padding: 0.9rem 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-complete {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.btn-complete:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(37, 99, 235, 0.3);
+}
+
+.btn-fail {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.btn-fail:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(220, 38, 38, 0.3);
+}
+
+/* Objective Cards Grid */
+.objectives-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2rem;
+}
+
+.objective-card {
+    background-color: rgba(30, 41, 59, 0.8);
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    height: 100%;
+    min-height: 220px;
+}
+
+.objective-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.card-content {
+    padding: 1.8rem;
+    flex-grow: 1;
+}
+
+.objective-card .objective-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 1rem;
+}
+
+.objective-card .objective-difficulty {
+    display: inline-block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1.2rem;
+}
+
+.objective-description {
+    font-size: 1rem;
+    color: #94a3b8;
+    margin-top: 1rem;
+    line-height: 1.6;
+}
+
+.card-actions {
+    padding: 1.2rem 1.8rem;
+    border-top: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.btn-activate {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    width: 100%;
+    padding: 0.9rem 1.5rem;
+    font-size: 1rem;
+}
+
+.btn-activate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(79, 70, 229, 0.3);
+}
+
+/* Completed Objectives */
+.objective-card.completed {
+    background-color: rgba(30, 41, 59, 0.6);
+    border-color: rgba(71, 85, 105, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.objective-card.completed:before {
+    content: '✓';
+    position: absolute;
+    top: -15px;
+    right: 10px;
+    font-size: 5rem;
+    color: rgba(34, 197, 94, 0.1);
+    font-weight: bold;
+    line-height: 1;
+    z-index: 0;
+}
+
+.objective-card.completed .objective-title {
+    color: rgba(226, 232, 240, 0.8);
+}
+
+.objective-card.completed .objective-difficulty {
+    opacity: 0.7;
+}
+
+.completion-date {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #64748b;
+    padding-top: 0.7rem;
+    border-top: 1px dashed rgba(100, 116, 139, 0.2);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+}
+
+.completion-date:before {
+    content: '🏆';
+    margin-right: 6px;
+    font-size: 1.1rem;
+}
+
+/* Empty States */
+.empty-state, .empty-objectives {
+    background-color: rgba(30, 41, 59, 0.6);
+    border-radius: 0.8rem;
+    padding: 2.5rem;
+    text-align: center;
+    border: 1px dashed rgba(71, 85, 105, 0.3);
+}
+
+.empty-state p, .empty-content p {
+    color: #94a3b8;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.empty-state:before {
+    content: '🏆';
+    display: block;
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-objectives {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.empty-content {
+    max-width: 400px;
+}
+
+.btn-create-first {
+    display: inline-block;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    padding: 0.8rem 1.5rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+}
+
+.btn-create-first:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Description Toggle */
+.description-container {
+    margin-bottom: 1.5rem;
+}
+
+.description-toggle {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+    cursor: pointer;
+}
+
+.description-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Card-specific toggle styling */
+.card-toggle {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.3));
+    color: #94a3b8;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    width: 100%;
+    justify-content: center;
+    margin-top: 1rem;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.card-toggle:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.4));
+    color: #e2e8f0;
+}
+
+.toggle-icon {
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+.objective-description-dropdown {
+    display: none;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    border-radius: 0.5rem;
+    background-color: rgba(30, 41, 59, 0.8);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.objective-description-dropdown.show {
+    display: block;
+}
+
+/* Media query for desktop - customize grid based on screen size */
+@media (min-width: 1200px) {
+    .objectives-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2.5rem;
+    }
+    
+    .objective-card {
+        min-height: 250px;
+    }
+    
+    .dashboard-content {
+        padding: 3rem;
+    }
+}
+
+/* Adjust responsive behavior */
+@media (max-width: 768px) {
+    .dashboard-content {
+        padding: 1.5rem 1rem;
+    }
+    
+    .objectives-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .objectives-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .objective-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .btn-complete, .btn-fail {
+        width: 100%;
+        padding: 0.7rem 1.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .active-objective-card {
+        padding: 1.8rem;
+    }
+    
+    .active-objective-card .objective-title {
+        font-size: 1.4rem;
+    }
+    
+    .objective-card {
+        min-height: 200px;
+    }
+}
+</style>
+
+<script>
+function toggleDescription(button) {
+    const dropdown = button.nextElementSibling;
+    dropdown.classList.toggle('show');
+    button.querySelector('.toggle-icon').textContent = dropdown.classList.contains('show') ? '-' : '+';
+}
+
+function confirmPenalty(button) {
+    const penaltyDays = button.getAttribute('data-penalty-days');
+    return confirm(`Are you sure you want to mark this objective as failed? This will apply an XP penalty for ${penaltyDays} days.`);
+}
+</script>
+{% endblock %} 

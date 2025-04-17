@@ -1,0 +1,1288 @@
+{% extends 'base.html' %}
+
+{% block title %}Stats - The Journey{% endblock %}
+
+{% block content %}
+<style>
+    /* Enhanced color variables for consistency */
+    :root {
+        --primary-color: #3b82f6;
+        --primary-dark: #1e40af;
+        --primary-light: #93c5fd;
+        --accent-color: #8b5cf6;
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --danger-color: #ef4444;
+        --dark-text: #0f172a;
+        --light-text: #f8fafc;
+        --card-bg: rgba(255, 255, 255, 0.9);
+        --section-bg: rgba(248, 250, 252, 0.8);
+    }
+    
+    /* User Level Card Styles - Enhanced */
+    .user-stats-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .user-level-card {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(30, 64, 175, 0.3));
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        border-radius: 15px;
+        padding: 24px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 0 10px rgba(59, 130, 246, 0.2);
+        flex: 1;
+        min-width: 300px;
+        display: flex;
+        gap: 25px;
+        align-items: center;
+        backdrop-filter: blur(10px);
+    }
+    
+    .level-badge {
+        width: 90px;
+        height: 90px;
+        background: linear-gradient(135deg, #3b82f6, #1e40af);
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 8px 20px rgba(30, 64, 175, 0.3), 0 0 0 2px rgba(255, 255, 255, 0.2);
+        color: white;
+        position: relative;
+    }
+    
+    .level-badge::after {
+        content: '';
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: 2px solid rgba(147, 197, 253, 0.6);
+        animation: pulse-ring 2s ease-out infinite;
+    }
+    
+    .level-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    .level-label {
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+        font-weight: bold;
+        opacity: 0.9;
+    }
+    
+    .xp-stats {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .xp-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #ffffff;
+        margin-bottom: 5px;
+        letter-spacing: 0.5px;
+    }
+    
+    .xp-progress-container {
+        position: relative;
+        width: 100%;
+        margin-top: 10px;
+    }
+    
+    .xp-progress-bar {
+        height: 8px;
+        background: rgba(15, 23, 42, 0.2);
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .xp-progress {
+        position: absolute;
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #6366f1);
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    
+    .xp-text {
+        display: flex;
+        justify-content: flex-end;
+        font-size: 0.95rem;
+        color: #ffff61;
+        font-weight: 600;
+    }
+    
+    .xp-info {
+        font-size: 0.9rem;
+        color: #475569;
+    }
+    
+    .remaining-xp .value {
+        font-weight: bold;
+        color: #f8fafc;
+    }
+    
+    .recent-progress {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(76, 29, 149, 0.2));
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 0 10px rgba(139, 92, 246, 0.2);
+        flex: 1;
+        min-width: 300px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .recent-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #7c3aed;
+        margin-bottom: 15px;
+        letter-spacing: 0.5px;
+    }
+    
+    .progress-history {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .progress-record {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background-color: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .progress-record:hover {
+        transform: translateX(5px);
+        background-color: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .record-skill {
+        font-weight: bold;
+        color: #1e293b;
+    }
+    
+    .record-arrow {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .old-value {
+        color: #64748b;
+    }
+    
+    .arrow-icon {
+        color: #7c3aed;
+        font-weight: bold;
+    }
+    
+    .new-value {
+        font-weight: bold;
+        color: #7c3aed;
+    }
+    
+    .record-date {
+        color: #64748b;
+        font-size: 0.8rem;
+    }
+    
+    @keyframes pulse-ring {
+        0% {
+            transform: scale(0.8);
+            opacity: 0.8;
+        }
+        80%, 100% {
+            transform: scale(1.1);
+            opacity: 0;
+        }
+    }
+
+    /* Skill Overview Section - Enhanced */
+    .skill-overview-section {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        padding: 24px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        backdrop-filter: blur(10px);
+    }
+    
+    .section-title {
+        font-size: 1.4rem;
+        font-weight: bold;
+        margin-bottom: 24px;
+        color: #d8ebff;
+        text-align: center;
+        position: relative;
+        display: inline-block;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 25%;
+        right: 25%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        border-radius: 3px;
+    }
+    
+    .skill-overview-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 30px;
+        justify-content: center;
+    }
+    
+    .category-averages {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        flex: 1;
+        min-width: 250px;
+    }
+    
+    .category-avg {
+        display: flex;
+        align-items: center;
+        padding: 14px;
+        border-radius: 12px;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .category-avg:hover {
+        transform: translateX(8px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .category-avg.physical {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.25));
+        border-left: 4px solid #ef4444;
+    }
+    
+    .category-avg.mental {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(167, 139, 250, 0.25));
+        border-left: 4px solid #8b5cf6;
+    }
+    
+    .category-avg.communication {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25));
+        border-left: 4px solid #10b981;
+    }
+    
+    .category-avg.productivity {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.25));
+        border-left: 4px solid #f59e0b;
+    }
+    
+    .category-avg.education {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(96, 165, 250, 0.2));
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .category-icon {
+        font-size: 2rem;
+        margin-right: 18px;
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    
+    .category-icon::after {
+        content: '';
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        z-index: -1;
+    }
+    
+    .category-info {
+        flex: 1;
+    }
+    
+    .category-name {
+        font-weight: bold;
+        margin-bottom: 4px;
+        color: #7bd5cc;
+        font-size: 1.05rem;
+    }
+    
+    .category-value {
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #ffffff;
+    }
+    
+    .skill-chart-container {
+        width: 320px;
+        height: 320px;
+        position: relative;
+        margin: 0 auto;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.133);
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Custom colors for each skill category - Enhanced */
+    .skill-category-section {
+        margin-bottom: 25px;
+        padding: 20px;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* Physical & Strength category - Enhanced */
+    .skill-category-section.physical {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(248, 113, 113, 0.2));
+        border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .skill-category-section.physical .category-title {
+        color: #dc2626;
+        text-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+    }
+    .skill-category-section.physical .skill-card {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.25));
+        box-shadow: 0 5px 15px rgba(239, 68, 68, 0.15);
+    }
+    .skill-category-section.physical .skill-progress {
+        background: linear-gradient(90deg, #dc2626, #ef4444);
+    }
+    .skill-category-section.physical .skill-increase:hover {
+        background-color: #ef4444;
+    }
+    
+    /* Mental & Cognitive category - Enhanced */
+    .skill-category-section.mental {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(167, 139, 250, 0.2));
+        border: 1px solid rgba(139, 92, 246, 0.25);
+    }
+    .skill-category-section.mental .category-title {
+        color: #8b5cf6;
+        text-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+    }
+    .skill-category-section.mental .skill-card {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(167, 139, 250, 0.25));
+        box-shadow: 0 5px 15px rgba(139, 92, 246, 0.15);
+    }
+    .skill-category-section.mental .skill-progress {
+        background: linear-gradient(90deg, #7c3aed, #8b5cf6);
+    }
+    .skill-category-section.mental .skill-increase:hover {
+        background-color: #8b5cf6;
+    }
+    
+    /* Communication category - Enhanced */
+    .skill-category-section.communication {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25));
+        border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .skill-category-section.communication .category-title {
+        color: #059669;
+        text-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+    }
+    .skill-category-section.communication .skill-card {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25));
+        box-shadow: 0 5px 15px rgba(16, 185, 129, 0.15);
+    }
+    .skill-category-section.communication .skill-progress {
+        background: linear-gradient(90deg, #059669, #10b981);
+    }
+    .skill-category-section.communication .skill-increase:hover {
+        background-color: #10b981;
+    }
+    
+    /* Productivity category - Enhanced */
+    .skill-category-section.productivity {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.25));
+        border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+    .skill-category-section.productivity .category-title {
+        color: #d97706;
+        text-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+    }
+    .skill-category-section.productivity .skill-card {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.25));
+        box-shadow: 0 5px 15px rgba(245, 158, 11, 0.15);
+    }
+    .skill-category-section.productivity .skill-progress {
+        background: linear-gradient(90deg, #d97706, #f59e0b);
+    }
+    .skill-category-section.productivity .skill-increase:hover {
+        background-color: #f59e0b;
+    }
+    
+    /* Education category - Enhanced */
+    .skill-category-section.education {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(96, 165, 250, 0.2));
+        border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+    .skill-category-section.education .category-title {
+        color: #2563eb;
+        text-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+    }
+    .skill-category-section.education .skill-card {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(96, 165, 250, 0.25));
+        box-shadow: 0 5px 15px rgba(59, 130, 246, 0.15);
+    }
+    .skill-category-section.education .skill-progress {
+        background: linear-gradient(90deg, #2563eb, #3b82f6);
+    }
+    .skill-category-section.education .skill-increase:hover {
+        background-color: #3b82f6;
+    }
+    
+    /* Enhanced skill cards */
+    .skill-card {
+        position: relative;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        backdrop-filter: blur(5px);
+        margin: 6px;
+    }
+    
+    .skill-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    .skill-icon {
+        font-size: 1.6rem;
+        margin-bottom: 8px;
+        animation: pulse 3s infinite alternate;
+    }
+    
+    .skill-name {
+        font-weight: bold;
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+        color: rgba(255, 255, 255, 0.95);
+    }
+    
+    .skill-level {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 8px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+        opacity: 1;
+    }
+    
+    .skill-level.updating {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    
+    .skill-progress-bar {
+        height: 4px;
+        background: rgba(100, 116, 139, 0.2);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 5px;
+        position: relative;
+    }
+    
+    .skill-progress {
+        position: absolute;
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #6366f1);
+        border-radius: 2px;
+        transition: width 0.5s ease;
+    }
+    
+    .skill-increase {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 32px;
+        height: 32px;
+        background-color: rgba(255, 255, 255, 0.25);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        z-index: 10;
+        font-size: 1.1rem;
+        color: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .skill-increase:hover {
+        transform: scale(1.15);
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+    }
+    
+    /* Loading text styles */
+    .loading-text {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.8);
+        background: rgba(0, 0, 0, 0.7);
+        padding: 3px 8px;
+        border-radius: 4px;
+        width: auto;
+        max-width: 90%;
+        white-space: nowrap;
+        z-index: 5;
+    }
+    
+    /* Tooltip styles */
+    .skill-tooltip {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.95);
+        color: white;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s;
+        pointer-events: none;
+        max-height: 95%;
+        overflow-y: auto;
+    }
+    
+    .skill-tooltip.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    
+    .tooltip-title {
+        font-size: 1.1rem;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: var(--primary-light);
+    }
+    
+    .info-indicator {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        font-size: 1rem;
+        opacity: 0;
+        transition: all 0.3s;
+    }
+    
+    .skill-card:hover .info-indicator {
+        opacity: 1;
+    }
+    
+    /* Enhanced header */
+    .level-number {
+        background: linear-gradient(135deg, #ffffff, #92b1ad);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-size: 3.2rem;
+        font-weight: bold;
+        text-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        animation: glow 2s ease-in-out infinite alternate;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    
+    .category-title {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 18px;
+        font-size: 1.4rem;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+    
+    .stats-title {
+        font-size: 1.8rem;
+        text-align: center;
+        margin-bottom: 25px;
+        color: #ffffff;
+        font-weight: bold;
+        position: relative;
+        display: inline-block;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    
+    .stats-title::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 20%;
+        right: 20%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        border-radius: 3px;
+    }
+    
+    /* Enhanced animations */
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); opacity: 0.9; }
+        100% { transform: scale(1.15); opacity: 1; }
+    }
+    
+    @keyframes glow {
+        0% { text-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+        100% { text-shadow: 0 0 25px rgba(59, 130, 246, 0.8); }
+    }
+    
+    /* Enhanced grid layout */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 15px;
+    }
+    
+    /* Responsive improvements */
+    @media (max-width: 768px) {
+        .user-level-card {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 15px;
+            padding: 20px 15px;
+        }
+        
+        .xp-stats {
+            width: 100%;
+        }
+        
+        .skill-overview-container {
+            flex-direction: column;
+        }
+        
+        .skill-chart-container {
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        }
+    }
+</style>
+
+<div class="dashboard-content stats-page">
+    <div class="level-display">
+        <div class="level-header">
+            <div class="level-number">Stats</div>
+        </div>
+        
+        <!-- Add user level and XP statistics card -->
+        <div class="user-stats-container">
+            <div class="user-level-card">
+                <div class="level-badge">
+                    <div class="level-value">{{ user.level }}</div>
+                    <div class="level-label">LEVEL</div>
+                </div>
+                <div class="xp-stats">
+                    <div class="xp-title">Experience Points</div>
+                    <div class="xp-progress-container">
+                        <div class="xp-progress-bar">
+                            <div class="xp-progress" style="width: {{ progress_percentage }}%;"></div>
+                        </div>
+                        <div class="xp-text">
+                            <span class="current-xp">{{ user.xp }}</span>
+                            <span class="slash">/</span>
+                            <span class="xp-to-next">{{ user.xp_to_next_level }}</span>
+                            <span class="xp-label">XP</span>
+                        </div>
+                    </div>
+                    <div class="xp-info">
+                        <div class="remaining-xp">
+                            <span class="value">{{ user.xp_to_next_level - user.xp }}</span> XP remaining to reach Level {{ user.level + 1 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add recent progress records if available -->
+            {% if progress_records and progress_records|length > 0 %}
+            <div class="recent-progress">
+                <h3 class="recent-title">Recent Improvements</h3>
+                <div class="progress-history">
+                    {% for record in progress_records[:5] %}
+                    <div class="progress-record">
+                        <div class="record-skill">{{ record.category }}</div>
+                        <div class="record-arrow">
+                            <span class="old-value">{{ record.old_value }}</span>
+                            <span class="arrow-icon">→</span>
+                            <span class="new-value">{{ record.new_value }}</span>
+                        </div>
+                        <div class="record-date">{{ record.created_at.strftime('%b %d') }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Add skill overview section with chart -->
+        <div class="skill-overview-section">
+            <h3 class="section-title">Skill Balance</h3>
+            <div class="skill-overview-container">
+                <!-- Category averages display -->
+                <div class="category-averages">
+                    <div class="category-avg physical">
+                        <div class="category-icon">💪</div>
+                        <div class="category-info">
+                            <div class="category-name">Physical</div>
+                            <div class="category-value">{{ ((user.strength + user.endurance + user.flexibility + user.agility + user.stamina) / 5) | round(1) }}</div>
+                        </div>
+                    </div>
+                    <div class="category-avg mental">
+                        <div class="category-icon">🧠</div>
+                        <div class="category-info">
+                            <div class="category-name">Mental</div>
+                            <div class="category-value">{{ ((user.perception + user.creativity + user.memory + user.logic + user.focus + user.resilience) / 6) | round(1) }}</div>
+                        </div>
+                    </div>
+                    <div class="category-avg communication">
+                        <div class="category-icon">🗣️</div>
+                        <div class="category-info">
+                            <div class="category-name">Communication</div>
+                            <div class="category-value">{{ ((user.speaking + user.writing + user.empathy + user.persuasion + user.active_listening) / 5) | round(1) }}</div>
+                        </div>
+                    </div>
+                    <div class="category-avg productivity">
+                        <div class="category-icon">⏰</div>
+                        <div class="category-info">
+                            <div class="category-name">Productivity</div>
+                            <div class="category-value">{{ ((user.time_management + user.organization + user.self_discipline + user.goal_setting + user.stress_management) / 5) | round(1) }}</div>
+                        </div>
+                    </div>
+                    <div class="category-avg education">
+                        <div class="category-icon">📊</div>
+                        <div class="category-info">
+                            <div class="category-name">Education</div>
+                            <div class="category-value">{{ ((user.research + user.analysis + user.critical_thinking + user.problem_solving + user.strategy) / 5) | round(1) }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Skill Balance Chart -->
+                <div class="skill-chart-container">
+                    <canvas id="skillBalanceChart" width="300" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Skills Overview -->
+        <div class="stats-overview">
+            <div class="stats-header">
+                <div class="level-text stats-title">All Skills</div>
+            </div>
+            
+            <!-- Template for skill cards with progress bars -->
+            {% macro skill_card(name, icon, value, skill_attr) %}
+            <div class="skill-card">
+                <div class="skill-increase" data-skill="{{ skill_attr }}" data-current="{{ value }}">+</div>
+                <div class="skill-icon">{{ icon }}</div>
+                <div class="skill-name">{{ name }}</div>
+                <div class="skill-level">{{ value|int }}</div>
+                <div class="skill-progress-bar">
+                    <div class="skill-progress" style="width: {{ ((value - value|int) * 100)|int }}%;"></div>
+                </div>
+                
+                <!-- Add tooltip with skill description -->
+                <div class="skill-tooltip">
+                    <div class="tooltip-title">{{ name }}</div>
+                    <p>{% if skill_attr == "strength" %}
+                        Physical power and muscle capability. Improves your ability to lift, push, and exert force.
+                    {% elif skill_attr == "endurance" %}
+                        Ability to sustain prolonged physical activity. Enhances stamina and resistance to fatigue.
+                    {% elif skill_attr == "flexibility" %}
+                        Range of motion in joints and muscles. Increases your ability to bend and stretch.
+                    {% elif skill_attr == "agility" %}
+                        Ability to move quickly and easily. Improves coordination and reflexes.
+                    {% elif skill_attr == "stamina" %}
+                        Mental and physical energy to persist. Enhances your ability to maintain effort over time.
+                    {% elif skill_attr == "growth" %}
+                    Support your body's natural development by growing taller, improving posture, and staying healthy through good habits.
+                    {% elif skill_attr == "perception" %}
+                        Awareness and understanding of surroundings. Sharpens your senses and observation skills.
+                    {% elif skill_attr == "creativity" %}
+                        Ability to generate new ideas and solutions. Enhances innovative thinking.
+                    {% elif skill_attr == "memory" %}
+                        Capacity to retain and recall information. Improves learning and knowledge retention.
+                    {% elif skill_attr == "logic" %}
+                        Ability to reason and analyze problems. Enhances critical thinking and problem-solving.
+                    {% elif skill_attr == "focus" %}
+                        Ability to concentrate and maintain attention. Improves productivity and learning efficiency.
+                    {% elif skill_attr == "resilience" %}
+                        The ability to stay strong and recover quickly from stress, failure, or difficult situations.
+                    {% elif skill_attr == "speaking" %}
+                        Verbal communication skills. Enhances your ability to articulate thoughts clearly.
+                    {% elif skill_attr == "writing" %}
+                        Written communication abilities. Improves clarity and expression in text.
+                    {% elif skill_attr == "empathy" %}
+                        Ability to understand others' feelings. Enhances emotional intelligence and relationships.
+                    {% elif skill_attr == "persuasion" %}
+                        Ability to influence and convince others. Improves leadership and negotiation.
+                    {% elif skill_attr == "active_listening" %}
+                        Skill of fully focusing on and understanding speakers. Enhances relationships and learning.
+                    {% elif skill_attr == "time_management" %}
+                        Ability to use time effectively. Improves efficiency and reduces procrastination.
+                    {% elif skill_attr == "organization" %}
+                        Ability to arrange tasks and resources efficiently. Enhances productivity and reduces stress.
+                    {% elif skill_attr == "self_discipline" %}
+                        Control over impulses and habits. Improves consistency and goal achievement.
+                    {% elif skill_attr == "goal_setting" %}
+                        Ability to establish clear objectives. Enhances direction and motivation.
+                    {% elif skill_attr == "stress_management" %}
+                        Ability to handle pressure and anxiety. Improves resilience and well-being.
+                    {% elif skill_attr == "research" %}
+                        Ability to find and evaluate information. Enhances knowledge acquisition.
+                    {% elif skill_attr == "analysis" %}
+                        Ability to examine and interpret data. Improves decision-making and insight.
+                    {% elif skill_attr == "critical_thinking" %}
+                        Ability to evaluate information objectively. Enhances reasoning and judgment.
+                    {% elif skill_attr == "problem_solving" %}
+                        Ability to find solutions to challenges. Improves resourcefulness and adaptability.
+                    {% elif skill_attr == "strategy" %}
+                        Ability to plan and implement effective approaches. Enhances long-term success.
+                    {% else %}
+                        Develop this skill to enhance your capabilities and personal growth.
+                    {% endif %}</p>
+                </div>
+                
+                <!-- Info indicator that shows during hover -->
+                <div class="info-indicator">ℹ️</div>
+            </div>
+            {% endmacro %}
+
+            <!-- Physical & Strength-Based Skills -->
+            <div class="skill-category-section physical">
+                <h3 class="category-title">Physical & Strength-Based Skills</h3>
+                <div class="stats-grid">
+                    {{ skill_card("Strength", "💪", user.strength, "strength") }}
+                    {{ skill_card("Endurance", "🏃", user.endurance, "endurance") }}
+                    {{ skill_card("Flexibility", "🧘", user.flexibility, "flexibility") }}
+                    {{ skill_card("Agility", "⚡", user.agility, "agility") }}
+                    {{ skill_card("Stamina", "🏎️", user.stamina, "stamina") }}
+                    {{ skill_card("Growth", "🌱", user.growth, "growth") }}
+                </div>
+            </div>
+
+            <!-- Mental & Cognitive Skills -->
+            <div class="skill-category-section mental">
+                <h3 class="category-title">Mental & Cognitive Skills</h3>
+                <div class="stats-grid">
+                    {{ skill_card("Perception", "👁️", user.perception, "perception") }}
+                    {{ skill_card("Creativity", "🎨", user.creativity, "creativity") }}
+                    {{ skill_card("Memory", "🧠", user.memory, "memory") }}
+                    {{ skill_card("Logic", "🔧", user.logic, "logic") }}
+                    {{ skill_card("Focus", "🎯", user.focus, "focus") }}
+                    {{ skill_card("Resilience", "🛡️", user.resilience, "resilience") }}
+                </div>
+            </div>
+
+            <!-- Communication & Social Skills -->
+            <div class="skill-category-section communication">
+                <h3 class="category-title">Communication & Social Skills</h3>
+                <div class="stats-grid">
+                    {{ skill_card("Speaking", "🗣️", user.speaking, "speaking") }}
+                    {{ skill_card("Writing", "📝", user.writing, "writing") }}
+                    {{ skill_card("Empathy", "❤️", user.empathy, "empathy") }}
+                    {{ skill_card("Persuasion", "💬", user.persuasion, "persuasion") }}
+                    {{ skill_card("Active Listening", "👂", user.active_listening, "active_listening") }}
+                </div>
+            </div>
+
+            <!-- Productivity & Discipline -->
+            <div class="skill-category-section productivity">
+                <h3 class="category-title">Productivity & Discipline</h3>
+                <div class="stats-grid">
+                    {{ skill_card("Time Management", "⏰", user.time_management, "time_management") }}
+                    {{ skill_card("Organization", "📋", user.organization, "organization") }}
+                    {{ skill_card("Self-Discipline", "⚖️", user.self_discipline, "self_discipline") }}
+                    {{ skill_card("Goal Setting", "🎯", user.goal_setting, "goal_setting") }}
+                    {{ skill_card("Stress Management", "🧘", user.stress_management, "stress_management") }}
+                </div>
+            </div>
+
+            <!-- Education & Technical Skills -->
+            <div class="skill-category-section education">
+                <h3 class="category-title">Education & Technical Skills</h3>
+                <div class="stats-grid">
+                    {{ skill_card("Research", "🔍", user.research, "research") }}
+                    {{ skill_card("Analysis", "📊", user.analysis, "analysis") }}
+                    {{ skill_card("Critical Thinking", "💭", user.critical_thinking, "critical_thinking") }}
+                    {{ skill_card("Problem Solving", "🧩", user.problem_solving, "problem_solving") }}
+                    {{ skill_card("Strategy", "🎮", user.strategy, "strategy") }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add both hover and click handling for tooltips
+        const skillCards = document.querySelectorAll('.skill-card');
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        
+        skillCards.forEach(card => {
+            let hoverTimer;
+            let tooltipVisible = false;
+            const tooltip = card.querySelector('.skill-tooltip');
+            
+            if (isTouchDevice) {
+                // For touch devices, toggle tooltip on click/tap
+                card.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('skill-increase')) {
+                        return; // Don't show tooltip when clicking the + button
+                    }
+                    
+                    // Toggle tooltip visibility
+                    if (!tooltipVisible) {
+                        // Hide all other tooltips first
+                        document.querySelectorAll('.skill-tooltip.visible').forEach(t => {
+                            if (t !== tooltip) t.classList.remove('visible');
+                        });
+                        
+                        tooltip.classList.add('visible');
+                        tooltipVisible = true;
+                    } else {
+                        tooltip.classList.remove('visible');
+                        tooltipVisible = false;
+                    }
+                });
+                
+                // Close tooltip when clicking elsewhere
+                document.addEventListener('click', (e) => {
+                    if (!card.contains(e.target) && tooltipVisible) {
+                        tooltip.classList.remove('visible');
+                        tooltipVisible = false;
+                    }
+                });
+            } else {
+                // For desktop, use hover with a delay
+                card.addEventListener('mouseenter', (event) => {
+                    // Skip if hovering on the + button
+                    if (event.target.classList.contains('skill-increase') || 
+                        event.target.closest('.skill-increase')) {
+                        return;
+                    }
+                    
+                    // Clear any existing timers and reset tooltip state
+                    clearTimeout(hoverTimer);
+                    tooltip.classList.remove('visible');
+                    
+                    // Add hovering class immediately for visual feedback
+                    card.classList.add('hovering');
+                    
+                    // Create/update loading text element
+                    let loadingText = card.querySelector('.loading-text');
+                    if (!loadingText) {
+                        loadingText = document.createElement('div');
+                        loadingText.className = 'loading-text loading';
+                        loadingText.textContent = 'Hold for info...';
+                        card.appendChild(loadingText);
+                    } else {
+                        loadingText.style.display = 'block';
+                        loadingText.className = 'loading-text loading';
+                    }
+                    
+                    // Set exact timestamp when hover started
+                    card.setAttribute('data-hover-start', Date.now());
+                    
+                    // Set the timer for exactly 5 seconds
+                    hoverTimer = setTimeout(() => {
+                        // Double check we've hovered for the full duration
+                        const hoverStart = parseInt(card.getAttribute('data-hover-start'));
+                        const hoverDuration = Date.now() - hoverStart;
+                        
+                        if (hoverDuration >= 5000) {
+                            tooltip.classList.add('visible');
+                            console.log('Tooltip shown after ' + (hoverDuration/1000).toFixed(1) + ' seconds');
+                            
+                            // Hide loading text when tooltip is visible
+                            if (loadingText) {
+                                loadingText.style.display = 'none';
+                            }
+                        }
+                    }, 5000); // Exactly 5 seconds
+                });
+                
+                card.addEventListener('mouseleave', () => {
+                    clearTimeout(hoverTimer);
+                    tooltip.classList.remove('visible');
+                    card.classList.remove('hovering');
+                    
+                    // Hide loading text
+                    const loadingText = card.querySelector('.loading-text');
+                    if (loadingText) {
+                        loadingText.style.display = 'none';
+                    }
+                    
+                    // Reset hover timestamp
+                    card.removeAttribute('data-hover-start');
+                });
+            }
+            
+            // Special handling for the + button to prevent showing tooltip
+            const increaseBtn = card.querySelector('.skill-increase');
+            if (increaseBtn) {
+                increaseBtn.addEventListener('mouseenter', (e) => {
+                    // Stop event propagation
+                    e.stopPropagation();
+                    // Remove hovering state if it was active
+                    clearTimeout(hoverTimer);
+                    card.classList.remove('hovering');
+                });
+            }
+        });
+        
+        // Initialize skill increase buttons
+        const increaseButtons = document.querySelectorAll('.skill-increase');
+        increaseButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const skill = this.getAttribute('data-skill');
+                const currentLevel = parseInt(this.getAttribute('data-current'));
+                
+                // Call API to increase skill level
+                fetch('/api/increase_skill', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        skill: skill,
+                        current_level: currentLevel
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Add loading state during update
+                        const levelDisplay = this.parentElement.querySelector('.skill-level');
+                        const originalValue = levelDisplay.textContent;
+                        
+                        // Show loading indicator
+                        levelDisplay.textContent = 'Updating...';
+                        
+                        // Update the level display with smooth transition
+                        requestAnimationFrame(() => {
+                            // Ensure visibility
+                            levelDisplay.style.opacity = 1;
+                            levelDisplay.style.visibility = 'visible';
+                            
+                            // Update value
+                            levelDisplay.textContent = Math.floor(data.new_value);
+                            
+                            // Remove loading state
+                            setTimeout(() => {
+                                levelDisplay.style.opacity = '';
+                                levelDisplay.style.visibility = '';
+                            }, 100);
+                        });
+                        
+                        // Update the button's data attribute
+                        this.setAttribute('data-current', data.new_value);
+
+                        // If there was a level up, show a notification
+                        if (data.level_up) {
+                            if (window.journeyNotification) {
+                                window.journeyNotification.notify({
+                                    title: 'Level Up!',
+                                    message: `Congratulations! You leveled up to level ${data.level}!`,
+                                    type: 'success'
+                                });
+                            } else {
+                                alert('Congratulations! You leveled up to level ' + data.level + '!');
+                            }
+                        } else {
+                            // Show XP gained notification
+                            if (window.journeyNotification) {
+                                let message = `Skill increased! +1 to ${skill}. You earned ${data.xp_earned} XP.`;
+                                
+                                // Add penalty information if applicable
+                                if (data.penalty_applied) {
+                                    message = `Skill increased! +1 to ${skill}. You earned ${data.xp_earned} XP (${data.penalty_percent}% penalty applied).`;
+                                }
+                                
+                                window.journeyNotification.notify({
+                                    title: 'Skill Increased',
+                                    message: message,
+                                    type: 'success'
+                                });
+                            }
+                        }
+                        
+                        // Update XP display if available
+                        const xpElement = document.getElementById('user-xp');
+                        if (xpElement) {
+                            xpElement.textContent = data.user_xp;
+                        }
+                        
+                        // Update progress bar if available
+                        const progressBar = document.querySelector('.level-progress-bar-fill');
+                        if (progressBar) {
+                            progressBar.style.width = data.progress + '%';
+                        }
+                    } else {
+                        // Restore original value on error
+                        levelDisplay.textContent = originalValue;
+                        alert(data.message || 'Error increasing skill level');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Restore original value on error
+                    levelDisplay.textContent = originalValue;
+                    alert('An error occurred while increasing the skill level');
+                });
+            });
+        });
+        
+        // Load Chart.js library dynamically
+        function loadChartJs() {
+            return new Promise((resolve, reject) => {
+                if (window.Chart) {
+                    resolve(window.Chart);
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                script.onload = () => resolve(window.Chart);
+                script.onerror = () => reject(new Error('Failed to load Chart.js'));
+                document.head.appendChild(script);
+            });
+        }
+        
+        // Create skill balance radar chart
+        loadChartJs().then(() => {
+            const ctx = document.getElementById('skillBalanceChart').getContext('2d');
+            
+            // Calculate category averages
+            const physical = {{ ((user.strength + user.endurance + user.flexibility + user.agility + user.stamina) / 5) | round(1) }};
+            const mental = {{ ((user.perception + user.creativity + user.memory + user.logic + user.focus + user.resilience) / 6) | round(1) }};
+            const communication = {{ ((user.speaking + user.writing + user.empathy + user.persuasion + user.active_listening) / 5) | round(1) }};
+            const productivity = {{ ((user.time_management + user.organization + user.self_discipline + user.goal_setting + user.stress_management) / 5) | round(1) }};
+            const education = {{ ((user.research + user.analysis + user.critical_thinking + user.problem_solving + user.strategy) / 5) | round(1) }};
+            
+            // Create the chart
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Physical', 'Mental', 'Communication', 'Productivity', 'Education'],
+                    datasets: [{
+                        label: 'Skill Balance',
+                        data: [physical, mental, communication, productivity, education],
+                        backgroundColor: 'rgba(75, 108, 183, 0.2)',
+                        borderColor: 'rgba(75, 108, 183, 0.8)',
+                        pointBackgroundColor: [
+                            '#ff6347', // Physical
+                            '#9370db', // Mental
+                            '#3cb371', // Communication
+                            '#ffa500', // Productivity
+                            '#4682b4'  // Education
+                        ],
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(75, 108, 183, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: {
+                                color: 'rgba(210, 210, 210, 0.3)'
+                            },
+                            grid: {
+                                color: 'rgba(210, 210, 210, 0.3)',
+                            },
+                            pointLabels: {
+                                color: '#ffffff',
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                stepSize: 1,
+                                backdropColor: 'transparent',
+                                color: '#64748b'
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 5
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            titleFont: {
+                                size: 14
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            padding: 10
+                        }
+                    }
+                }
+            });
+        }).catch(error => {
+            console.error('Chart initialization error:', error);
+            document.getElementById('skillBalanceChart').innerHTML = 'Chart could not be loaded.';
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %} 

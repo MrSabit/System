@@ -1,0 +1,2346 @@
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, jsonify, make_response
+from app.models import User, Objective, ProgressRecord, QuestCategory, QuestSettings, Mission, PenaltyPeriod, QuestCompletionRecord, Subject, Topic, StudySession, Subtopic, CustomSkill
+from app import db
+from datetime import datetime, timedelta
+import functools
+import os
+from sqlalchemy import text
+import json
+from flask_login import login_user, logout_user, current_user, login_required
+from app.forms import LoginForm, RegistrationForm, TaskForm, HabitForm, StudySessionForm
+
+bp = Blueprint('journey', __name__)
+
+# Mock user authentication - in a real app, use proper authentication
+@bp.before_app_request
+def load_logged_in_user():
+    user_id = session.get('user_id')
+    if user_id is None:
+        g.user = None
+    else:
+        g.user = User.query.get(user_id)
+
+def login_required(view):
+    @functools.wraps(view)
+    def wrapped_view(**kwargs):
+        if g.user is None:
+            return redirect(url_for('journey.login'))
+        return view(**kwargs)
+    return wrapped_view
+
+# Authentication routes
+@bp.route('/register', methods=('GET', 'POST'))
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+        
+        error = None
+        if not username:
+            error = 'Username is required.'
+        elif not email:
+            error = 'Email is required.'
+        elif not password:
+            error = 'Password is required.'
+        elif User.query.filter_by(username=username).first() is not None:
+            error = f"User {username} is already registered."
+        elif User.query.filter_by(email=email).first() is not None:
+            error = f"Email {email} is already registered."
+            
+        if error is None:
+            user = User(username=username, email=email)
+            user.set_password(password)
+            db.session.add(user)
+            db.session.commit()  # Commit to get user.id
+            
+            # Add initial objective
+            initial_objective = Objective(
+                title="Complete 5 strength exercises", 
+                description="Start your journey by completing 5 strength exercises",
+                user_id=user.id
+            )
+            db.session.add(initial_objective)
+            
+            # Create default quest settings for the user
+            default_settings = QuestSettings(
+                user_id=user.id,
+                base_xp=25,
+                auto_submit=True,
+                notification_enabled=True,
+                custom_quests_enabled=False,
+                skill_increase_min=0.2,
+                skill_increase_max=1.0
+            )
+            db.session.add(default_settings)
+            
+            db.session.commit()
+            return redirect(url_for('journey.login'))
+            
+        flash_with_notification(error, 'error')
+    
+    return render_template('auth/register.html')
+    
+@bp.route('/login', methods=('GET', 'POST'))
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        error = None
+        user = User.query.filter_by(username=username).first()
+        
+        if user is None:
+            error = 'Incorrect username.'
+        elif not user.check_password(password):
+            error = 'Incorrect password.'
+            
+        if error is None:
+            session.clear()
+            session['user_id'] = user.id
+            return redirect(url_for('journey.dashboard'))
+            
+        flash_with_notification(error, 'error')
+    
+    return render_template('auth/login.html')
+    
+@bp.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('journey.login'))
+
+# Main application routes
+@bp.route('/')
+def index():
+    if g.user:
+        return redirect(url_for('journey.dashboard'))
+    return render_template('index.html')
+
+@bp.route('/dashboard')
+@login_required
+def dashboard():
+    # Get active objective if any
+    active_objective = Objective.query.filter_by(user_id=g.user.id, is_active=True).first()
+    
+    # Pass current time for penalty calculations
+    now = datetime.utcnow()
+    
+    # Check if penalty_period table exists
+    try:
+        # Try to access penalties - if it fails, we'll catch the exception
+        penalties = PenaltyPeriod.query.filter_by(user_id=g.user.id).first()
+        has_penalty_table = True
+    except Exception:
+        has_penalty_table = False
+    
+    # Define all skills with their categories and icons
+    all_skills = [
+        # Physical & Strength-Based Skills
+        {"name": "Strength", "category": "Physical", "icon": "💪", "value": g.user.strength},
+        {"name": "Endurance", "category": "Physical", "icon": "🏃", "value": g.user.endurance},
+        {"name": "Flexibility", "category": "Physical", "icon": "🧘", "value": g.user.flexibility},
+        {"name": "Agility", "category": "Physical", "icon": "⚡", "value": g.user.agility},
+        {"name": "Stamina", "category": "Physical", "icon": "🏎️", "value": g.user.stamina},
+        
+        # Mental & Cognitive Skills
+        {"name": "Perception", "category": "Mental", "icon": "👁️", "value": g.user.perception},
+        {"name": "Creativity", "category": "Mental", "icon": "🎨", "value": g.user.creativity},
+        {"name": "Memory", "category": "Mental", "icon": "🧠", "value": g.user.memory},
+        {"name": "Logic", "category": "Mental", "icon": "🔧", "value": g.user.logic},
+        {"name": "Focus", "category": "Mental", "icon": "🎯", "value": g.user.focus},
+        
+        # Communication & Social Skills
+        {"name": "Speaking", "category": "Communication", "icon": "🗣️", "value": g.user.speaking},
+        {"name": "Writing", "category": "Communication", "icon": "📝", "value": g.user.writing},
+        {"name": "Empathy", "category": "Communication", "icon": "❤️", "value": g.user.empathy},
+        {"name": "Persuasion", "category": "Communication", "icon": "💬", "value": g.user.persuasion},
+        {"name": "Active Listening", "category": "Communication", "icon": "👂", "value": g.user.active_listening},
+        
+        # Productivity & Discipline
+        {"name": "Time Management", "category": "Productivity", "icon": "⏰", "value": g.user.time_management},
+        {"name": "Organization", "category": "Productivity", "icon": "📋", "value": g.user.organization},
+        {"name": "Self-Discipline", "category": "Productivity", "icon": "⚖️", "value": g.user.self_discipline},
+        {"name": "Goal Setting", "category": "Productivity", "icon": "🎯", "value": g.user.goal_setting},
+        {"name": "Stress Management", "category": "Productivity", "icon": "🧘", "value": g.user.stress_management},
+        
+        # Education & Technical Skills
+        {"name": "Research", "category": "Education", "icon": "🔍", "value": g.user.research},
+        {"name": "Analysis", "category": "Education", "icon": "📊", "value": g.user.analysis},
+        {"name": "Critical Thinking", "category": "Education", "icon": "💭", "value": g.user.critical_thinking},
+        {"name": "Problem Solving", "category": "Education", "icon": "🧩", "value": g.user.problem_solving},
+        {"name": "Strategy", "category": "Education", "icon": "🎮", "value": g.user.strategy}
+    ]
+    
+    # Sort skills by value and get top 6
+    top_skills = sorted(all_skills, key=lambda x: x["value"], reverse=True)[:6]
+    
+    return render_template(
+        'dashboard.html',
+        user=g.user,
+        progress_percentage=g.user.get_progress_percentage(),
+        active_objective=active_objective,
+        top_skills=top_skills,
+        now=now,
+        has_penalty_table=has_penalty_table
+    )
+
+@bp.route('/progress')
+@login_required
+def progress():
+    # Get user's progress records from the database
+    # Limit to last 10 records
+    progress_records = ProgressRecord.query.filter_by(user_id=g.user.id).order_by(ProgressRecord.created_at.desc()).limit(10).all()
+    
+    # Calculate percentage of progress to next level
+    progress_percentage = (g.user.xp / g.user.xp_to_next_level) * 100
+    
+    return render_template('progress.html', user=g.user, progress_records=progress_records, progress_percentage=progress_percentage)
+
+@bp.route('/stats')
+@login_required
+def stats():
+    progress_percentage = g.user.get_progress_percentage()
+    
+    # Get recent progress records - limited to 5
+    progress_records = db.session.query(ProgressRecord).filter_by(user_id=g.user.id).order_by(ProgressRecord.created_at.desc()).limit(5).all()
+    
+    # Get user's custom skills (with error handling for table not existing yet)
+    custom_skills = []
+    try:
+        custom_skills = CustomSkill.query.filter_by(user_id=g.user.id).all()
+    except Exception as e:
+        # If table doesn't exist yet, just return empty list and log error
+        print(f"Error fetching custom skills: {str(e)}")
+    
+    return render_template('stats.html', 
+        user=g.user, 
+                           progress_percentage=progress_percentage,
+                           progress_records=progress_records,
+                           custom_skills=custom_skills)
+
+@bp.route('/objectives')
+@login_required
+def objectives():
+    objectives = Objective.query.filter_by(user_id=g.user.id).order_by(Objective.created_at.desc()).all()
+    
+    # Count completed objectives
+    completed_objectives = [obj for obj in objectives if obj.completed_at is not None]
+    
+    return render_template(
+        'objectives.html', 
+        user=g.user,
+        progress_percentage=g.user.get_progress_percentage(),
+        objectives=objectives,
+        completed_count=len(completed_objectives),
+        total_count=len(objectives)
+    )
+
+@bp.route('/objectives/create', methods=('GET', 'POST'))
+@login_required
+def create_objective():
+    if request.method == 'POST':
+        title = request.form['title']
+        description = request.form.get('description', '')
+        difficulty = request.form.get('difficulty', 'medium')
+        
+        # Validate difficulty
+        if difficulty not in ['easy', 'medium', 'hard', 'extreme']:
+            difficulty = 'medium'  # Default to medium if invalid
+        
+        if not title:
+            flash_with_notification('Title is required!', 'error')
+        else:
+            # Set all current objectives to inactive
+            if request.form.get('set_active'):
+                current_objectives = Objective.query.filter_by(user_id=g.user.id, is_active=True).all()
+                for obj in current_objectives:
+                    obj.is_active = False
+            
+            objective = Objective(
+                title=title, 
+                description=description,
+                difficulty=difficulty,
+                is_active=bool(request.form.get('set_active')),
+                user_id=g.user.id
+            )
+            
+            db.session.add(objective)
+            db.session.commit()
+            flash_with_notification('Objective created successfully!', 'success')
+            return redirect(url_for('journey.objectives'))
+            
+    return render_template(
+        'create_objective.html', 
+        user=g.user,
+        progress_percentage=g.user.get_progress_percentage()
+    )
+
+@bp.route('/objectives/<int:id>/activate', methods=['POST'])
+@login_required
+def activate_objective(id):
+    objective = Objective.query.get_or_404(id)
+    
+    if objective.user_id != g.user.id:
+        flash_with_notification('Access denied!', 'error')
+        return redirect(url_for('journey.objectives'))
+    
+    # Deactivate all objectives
+    current_objectives = Objective.query.filter_by(user_id=g.user.id, is_active=True).all()
+    for obj in current_objectives:
+        obj.is_active = False
+    
+    # Activate selected objective
+    objective.is_active = True
+    
+    db.session.commit()
+    flash_with_notification('Objective activated!', 'success')
+    return redirect(url_for('journey.objectives'))
+
+@bp.route('/objectives/<int:id>/complete', methods=['POST'])
+@login_required
+def complete_objective(id):
+    objective = Objective.query.get_or_404(id)
+
+    if objective.user_id != g.user.id:
+        flash_with_notification('Access denied!', 'error')
+        return redirect(url_for('journey.objectives'))
+
+    objective.is_active = False
+    objective.completed_at = datetime.utcnow()
+
+    # Reward user with XP based on objective difficulty
+    difficulty_xp = {
+        'easy': 50,
+        'medium': 100,
+        'hard': 150,
+        'extreme': 200
+    }
+
+    # Get XP amount based on difficulty (default to medium if not found)
+    base_xp = difficulty_xp.get(objective.difficulty, 100)
+    
+    # Check if any penalty is active and apply it
+    multiplier = g.user.get_xp_multiplier()
+    actual_xp = g.user.add_xp(base_xp)
+    
+    # Check if user leveled up
+    if g.user.xp >= g.user.xp_to_next_level:
+        old_level = g.user.level 
+        g.user.level += 1
+        g.user.xp -= g.user.xp_to_next_level
+        g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+        level_up = True
+    
+    db.session.commit()
+    
+    # Show different message based on whether a penalty was applied
+    if multiplier < 1.0:
+        penalty_percent = int((1 - multiplier) * 100)
+        flash_with_notification(
+            f'Objective completed! You earned {actual_xp} XP ({penalty_percent}% penalty applied).',
+            'success',
+            'Objective Completed!'
+        )
+    else:
+        flash_with_notification(
+            f'Objective completed! You earned {actual_xp} XP.',
+            'success',
+            'Objective Completed!'
+        )
+    
+    return redirect(url_for('journey.objectives'))
+
+@bp.route('/objectives/<int:id>/fail', methods=['POST'])
+@login_required
+def fail_objective(id):
+    objective = Objective.query.get_or_404(id)
+
+    if objective.user_id != g.user.id:
+        flash_with_notification('Access denied!', 'error')
+        return redirect(url_for('journey.objectives'))
+
+    # Map difficulty levels to penalty durations in days
+    difficulty_penalty_days = {
+        'easy': 3,
+        'medium': 5,
+        'hard': 7,
+        'extreme': 9
+    }
+    
+    # Get penalty duration based on difficulty (default to medium if not found)
+    penalty_days = difficulty_penalty_days.get(objective.difficulty, 5)
+    
+    # Calculate end date - set to end of the last penalty day
+    start_date = datetime.utcnow()
+    # Set end date to be exactly the number of days later at 23:59:59
+    end_date = (start_date + timedelta(days=penalty_days)).replace(hour=23, minute=59, second=59)
+    
+    # Create a new penalty period
+    penalty = PenaltyPeriod(
+        user_id=g.user.id,
+        reason=f"Failed {objective.difficulty} objective: {objective.title}",
+        start_date=start_date,
+        end_date=end_date,
+        difficulty=objective.difficulty
+    )
+    
+    # Mark objective as not active (but not completed)
+    objective.is_active = False
+    
+    db.session.add(penalty)
+    db.session.commit()
+    
+    flash_with_notification(
+        f'Objective marked as failed. Your XP growth will be reduced by 50% for {penalty_days} days.',
+        'warning',
+        'Penalty Applied'
+    )
+    
+    return redirect(url_for('journey.objectives'))
+
+# Add this API endpoint after your existing routes
+@bp.route('/api/increase_skill', methods=['POST'])
+@login_required
+def increase_skill():
+    skill_name = request.json.get('skill', None)
+    
+    if not skill_name:
+        return jsonify({'status': 'error', 'message': 'No skill specified'}), 400
+    
+    # Handle custom skills (format: custom_123 where 123 is the skill ID)
+    if skill_name.startswith('custom_'):
+        try:
+            skill_id = int(skill_name.split('_')[1])
+            custom_skill = CustomSkill.query.filter_by(id=skill_id, user_id=g.user.id).first()
+            
+            if not custom_skill:
+                return jsonify({'status': 'error', 'message': 'Invalid custom skill'}), 400
+            
+            custom_skill.level += 1.0
+            
+            # Check if penalty is active
+            multiplier = g.user.get_xp_multiplier()
+            penalty_active = multiplier < 1.0
+            
+            # Award XP for increasing a skill, with penalty if applicable
+            base_xp_amount = 10
+            actual_xp = g.user.add_xp(base_xp_amount)
+            
+            # Check if user leveled up
+            level_up = False
+            if g.user.xp >= g.user.xp_to_next_level:
+                old_level = g.user.level
+                g.user.level += 1
+                g.user.xp -= g.user.xp_to_next_level
+                g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+                level_up = True
+            
+            db.session.commit()
+            
+            # Prepare the response
+            response = {
+                'success': True,
+                'status': 'success',
+                'new_value': round(custom_skill.level, 1),
+                'skill_increase': 1.0,  # Always increases by 1.0
+                'base_xp': base_xp_amount,  # Original XP amount before penalty
+                'xp_earned': actual_xp,  # Actual XP after penalty
+                'user_xp': g.user.xp,
+                'level': g.user.level,
+                'level_up': level_up,
+                'xp_to_next': g.user.xp_to_next_level,
+                'progress': g.user.get_progress_percentage()
+            }
+            
+            # Add penalty information if applicable
+            if penalty_active:
+                penalty_percent = int((1 - multiplier) * 100)
+                response['penalty_applied'] = True
+                response['penalty_percent'] = penalty_percent
+                response['xp_lost'] = base_xp_amount - actual_xp
+            else:
+                response['penalty_applied'] = False
+            
+            return jsonify(response)
+            
+        except (ValueError, IndexError):
+            return jsonify({'status': 'error', 'message': 'Invalid custom skill format'}), 400
+    
+    # Handle standard skills
+    if not hasattr(g.user, skill_name):
+        return jsonify({'status': 'error', 'message': 'Invalid skill'}), 400
+    
+    current_value = getattr(g.user, skill_name)
+    setattr(g.user, skill_name, current_value + 1.0)
+    
+    # Check if penalty is active
+    multiplier = g.user.get_xp_multiplier()
+    penalty_active = multiplier < 1.0
+    
+    # Award XP for increasing a skill, with penalty if applicable
+    base_xp_amount = 10
+    actual_xp = g.user.add_xp(base_xp_amount)
+    
+    # Check if user leveled up
+    level_up = False
+    if g.user.xp >= g.user.xp_to_next_level:
+        old_level = g.user.level
+        g.user.level += 1
+        g.user.xp -= g.user.xp_to_next_level
+        g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+        level_up = True
+    
+    db.session.commit()
+    
+    # Prepare the response
+    response = {
+        'success': True,
+        'status': 'success',
+        'new_value': round(getattr(g.user, skill_name), 1),
+        'skill_increase': 1.0,  # Always increases by 1.0
+        'base_xp': base_xp_amount,  # Original XP amount before penalty
+        'xp_earned': actual_xp,  # Actual XP after penalty
+        'user_xp': g.user.xp,
+        'level': g.user.level,
+        'level_up': level_up,
+        'xp_to_next': g.user.xp_to_next_level,
+        'progress': g.user.get_progress_percentage()
+    }
+    
+    # Add penalty information if applicable
+    if penalty_active:
+        penalty_percent = int((1 - multiplier) * 100)
+        response['penalty_applied'] = True
+        response['penalty_percent'] = penalty_percent
+        response['xp_lost'] = base_xp_amount - actual_xp
+    else:
+        response['penalty_applied'] = False
+    
+    return jsonify(response)
+
+@bp.route('/daily_quests')
+@login_required
+def daily_quests():
+    # Get the current day of the week (0 = Monday, 6 = Sunday)
+    day_of_week = datetime.now().weekday()
+    
+    # Day names for display
+    day_names = {
+        0: "Monday (Strength & Discipline)",
+        1: "Tuesday (Endurance & Communication)",
+        2: "Wednesday (Flexibility & Perception)",
+        3: "Thursday (Agility & Creativity)",
+        4: "Friday (Stamina & Listening)",
+        5: "Saturday (Memory & Persuasion)",
+        6: "Sunday (Strategy & Reflection)"
+    }
+    
+    current_day = day_names[day_of_week]
+    
+    # Get user settings or create default
+    settings = db.session.query(QuestSettings).filter_by(user_id=g.user.id).first()
+    if not settings:
+        settings = QuestSettings(user_id=g.user.id)
+        db.session.add(settings)
+        db.session.commit()
+    
+    # Determine which quests file to use
+    quest_file_path = settings.custom_quests_path if settings.custom_quests_enabled and settings.custom_quests_path else 'app/daily_quests.md'
+    
+    try:
+        # Read the daily quests from the file
+        with open(quest_file_path, 'r') as file:
+            content = file.read()
+    except FileNotFoundError:
+        # Fallback to default if custom file not found
+        with open('app/daily_quests.md', 'r') as file:
+            content = file.read()
+        if settings.custom_quests_enabled:
+            settings.custom_quests_enabled = False
+            db.session.commit()
+            flash_with_notification("Custom quests file not found. Using default quests.", "error")
+    
+    # Parse the markdown to extract the tasks for all days
+    day_sections = {}
+    current_section = None
+    in_list = False
+    task_list = []
+    
+    for line in content.splitlines():
+        # Skip empty lines and those that don't start with # or -
+        if not line.strip() or (not line.startswith('#') and not line.startswith('-') and not line.startswith('*')):
+            continue
+        
+        # Check for section heading
+        if line.startswith('#'):
+            # Save the previous section's tasks if any
+            if current_section and task_list:
+                day_sections[current_section] = task_list
+            
+            # Start a new section
+            current_section = line.strip('# ').strip()
+            task_list = []
+            in_list = False
+        
+        # Check for list items
+        elif (line.startswith('-') or line.startswith('*')) and current_section:
+            task = line.strip('- *').strip()
+            if task:  # Skip empty items
+                task_list.append(task)
+            in_list = True
+    
+    # Save the last section if any
+    if current_section and task_list:
+        day_sections[current_section] = task_list
+    
+    # Load data from database
+    db_quest_records = QuestCompletionRecord.query.filter_by(user_id=g.user.id).all()
+    
+    # Initialize session data if not present
+    if 'completed_days' not in session:
+        session['completed_days'] = []
+    if 'partial_days' not in session:
+        session['partial_days'] = []
+    if 'completed_tasks' not in session:
+        session['completed_tasks'] = {str(i): [] for i in range(7)}
+    if 'last_visited_day' not in session:
+        session['last_visited_day'] = day_of_week
+    
+    # Get data from session
+    completed_days = session.get('completed_days', [])
+    partial_days = session.get('partial_days', [])
+    completed_tasks = session.get('completed_tasks', {})
+    last_visited_day = session.get('last_visited_day', day_of_week)
+    
+    # Check if this is a new week or new user
+    is_new_user = len(db_quest_records) == 0 and not any([completed_days, partial_days])
+    
+    # Track when the user first started using the app this week
+    if 'week_start_day' not in session:
+        session['week_start_day'] = day_of_week
+        
+    # Store current week number for week transitions
+    current_week = datetime.now().isocalendar()[1]  # ISO week number
+    if 'current_week' not in session:
+        session['current_week'] = current_week
+    elif session['current_week'] != current_week:
+        # It's a new week, reset the week data
+        session['completed_days'] = []
+        session['partial_days'] = []
+        session['completed_tasks'] = {str(i): [] for i in range(7)}
+        session['current_week'] = current_week
+        session['week_start_day'] = day_of_week
+        
+        # Reset variables after session update
+        completed_days = []
+        partial_days = []
+        completed_tasks = {str(i): [] for i in range(7)}
+    
+    # Merge database records with session data
+    for record in db_quest_records:
+        day_idx = record.day_index
+        
+        # Update completed_days and partial_days lists
+        if record.is_completed and day_idx not in completed_days:
+            completed_days.append(day_idx)
+        elif record.is_partial and day_idx not in partial_days:
+            partial_days.append(day_idx)
+        
+        # Update completed_tasks with tasks from database
+        db_tasks = record.get_completed_tasks()
+        if db_tasks:
+            # Convert day index to string for session data
+            str_day_idx = str(day_idx)
+            # Only update if database has more tasks than session
+            if str_day_idx not in completed_tasks or len(db_tasks) > len(completed_tasks[str_day_idx]):
+                completed_tasks[str_day_idx] = db_tasks
+    
+    # Update session with merged data
+    session['completed_days'] = completed_days
+    session['partial_days'] = partial_days
+    session['completed_tasks'] = completed_tasks
+    
+    # Auto-submit quests from previous day if enabled in settings and if day changed
+    if settings.auto_submit:
+        previous_day = (day_of_week - 1) % 7  # Previous day with wrap-around
+        
+        # Get the current time and calculate when the previous day ended
+        current_time = datetime.now()
+        previous_day_end = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        hours_since_day_change = (current_time - previous_day_end).total_seconds() / 3600
+        
+        # Get grace period (with fallback if column doesn't exist yet)
+        try:
+            grace_period = settings.grace_period_hours
+        except:
+            grace_period = 12  # Default to 12 hours if column doesn't exist
+        
+        # Check if day has changed since last visit, if the grace period has passed, and if previous day has tasks
+        if (last_visited_day != day_of_week and 
+            hours_since_day_change >= grace_period and  # Check if grace period has passed
+            str(previous_day) in completed_tasks and 
+            completed_tasks[str(previous_day)]):
+            
+            prev_completed_count = len(completed_tasks[str(previous_day)])
+            
+            # Get total number of tasks for previous day
+            prev_day_tasks = []
+            prev_day_prefix = day_names[previous_day].split(' ')[0]
+            for section_name, section_tasks in day_sections.items():
+                if section_name.startswith(prev_day_prefix):
+                    prev_day_tasks = section_tasks
+                    break
+            
+            prev_total_count = len(prev_day_tasks)
+            
+            # Only process if there were completed tasks
+            if prev_completed_count > 0 and previous_day not in completed_days and previous_day not in partial_days:
+                # Calculate completion percentage
+                completion_percentage = prev_completed_count / prev_total_count if prev_total_count > 0 else 0
+                
+                # Determine if this is a partial or full completion
+                is_partial = prev_completed_count < prev_total_count
+                
+                # Update the appropriate completion list
+                if is_partial:
+                    # Mark as partially completed
+                    if previous_day not in partial_days:
+                        partial_days.append(previous_day)
+                        session['partial_days'] = partial_days
+                        
+                        # Apply a penalty for not completing all tasks
+                        day_names = {
+                            0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday",
+                            4: "Friday", 5: "Saturday", 6: "Sunday"
+                        }
+                        
+                        # Calculate penalty rate using the formula: ((completed_tasks + total_count) / (2 * total_count))
+                        # This gives penalty_rate between 0.5 (0 tasks completed) and 1.0 (all tasks completed)
+                        penalty_rate = (prev_completed_count + prev_total_count) / (2 * prev_total_count)
+                        
+                        # Set penalty for exactly 24 hours
+                        start_date = datetime.utcnow()
+                        end_date = start_date + timedelta(hours=24)
+                        
+                        # Create a penalty period
+                        penalty = PenaltyPeriod(
+                            user_id=g.user.id,
+                            reason=f"Auto: Incomplete {day_names.get(previous_day, 'daily')} quests ({prev_completed_count}/{prev_total_count})",
+                            start_date=start_date,
+                            end_date=end_date,
+                            penalty_rate=penalty_rate,  # Dynamic penalty based on completion ratio
+                            is_active=True,
+                            difficulty="daily"  # Special difficulty type for daily quests
+                        )
+                        db.session.add(penalty)
+                else:
+                    # Mark as fully completed
+                    if previous_day not in completed_days:
+                        completed_days.append(previous_day)
+                        session['completed_days'] = completed_days
+                        
+                        # Remove from partial days if it was there
+                        if previous_day in partial_days:
+                            partial_days.remove(previous_day)
+                            session['partial_days'] = partial_days
+                
+                # Reward user with XP for completing daily quests
+                skills_to_increase = {
+                    0: 'self_discipline',  # Monday
+                    1: 'endurance',        # Tuesday
+                    2: 'flexibility',      # Wednesday
+                    3: 'creativity',       # Thursday
+                    4: 'active_listening', # Friday
+                    5: 'memory',           # Saturday
+                    6: 'strategy'          # Sunday
+                }
+                
+                skill_to_increase = skills_to_increase.get(previous_day, 'self_discipline')
+                
+                # Increase the specific skill based on completion percentage and settings
+                if hasattr(g.user, skill_to_increase):
+                    current_value = getattr(g.user, skill_to_increase)
+                    # Scale skill increase between min and max based on completion percentage
+                    completion_percentage = prev_completed_count / prev_total_count if prev_total_count > 0 else 0
+                    skill_increase = settings.skill_increase_min + (settings.skill_increase_max - settings.skill_increase_min) * completion_percentage
+                    skill_increase = max(settings.skill_increase_min, min(settings.skill_increase_max, skill_increase))
+                    setattr(g.user, skill_to_increase, current_value + skill_increase)
+                    
+                # Auto-complete yesterday's quests - No penalty is applied to daily quest XP
+                base_xp = settings.base_xp  # Use base XP from settings
+                
+                # Apply completion formula for XP calculation
+                completion_percentage = prev_completed_count / prev_total_count if prev_total_count > 0 else 0
+                xp_earned = round(base_xp * completion_percentage)
+                
+                # Do NOT apply penalty periods to daily quests - Add XP directly
+                g.user.xp += xp_earned
+                
+                # Check if user leveled up
+                old_level = g.user.level
+                if g.user.xp >= g.user.xp_to_next_level:
+                    g.user.level += 1
+                    g.user.xp -= g.user.xp_to_next_level
+                    g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+                
+                db.session.commit()
+                
+                # Flash messages with penalty information if applicable
+                multiplier = g.user.get_xp_multiplier()
+                penalty_applied = multiplier < 1.0
+                
+                # Only show messages if notifications are enabled
+                if settings.notification_enabled:
+                    status = "partially completed" if is_partial else "completed"
+                    
+                    if g.user.level > old_level:
+                        if penalty_applied:
+                            penalty_percent = int((1 - penalty_rate) * 100)
+                            flash_with_notification(f'Your {prev_day_prefix} quests were automatically {status}! You earned {xp_earned} XP ({penalty_percent}% penalty applied) and leveled up to level {g.user.level}!', 'success', 'Level Up!')
+                        else:
+                            flash_with_notification(f'Your {prev_day_prefix} quests were automatically {status}! You earned {xp_earned} XP and leveled up to level {g.user.level}!', 'success', 'Level Up!')
+                    else:
+                        if penalty_applied:
+                            penalty_percent = int((1 - penalty_rate) * 100)
+                            flash_with_notification(f'Your {prev_day_prefix} quests were automatically {status}! You earned {xp_earned} XP ({penalty_percent}% penalty applied).', 'success', 'Auto-Quest Completion')
+                        else:
+                            flash_with_notification(f'Your {prev_day_prefix} quests were automatically {status}! You earned {xp_earned} XP.', 'success', 'Auto-Quest Completion')
+
+    # Update last visited day to current day
+    session['last_visited_day'] = day_of_week
+    
+    # Calculate if within grace period for showing previous day's tasks
+    current_time = datetime.now()
+    previous_day_end = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    hours_since_day_change = (current_time - previous_day_end).total_seconds() / 3600
+    
+    # Get previous day index with wrap-around
+    previous_day = (day_of_week - 1) % 7
+    
+    # Prepare data for all days to pass to template
+    all_days_tasks = []
+    
+    for i in range(7):  # 0-6 for Monday-Sunday
+        day_name = day_names[i]
+        
+        # Find section for this day
+        day_tasks = []
+        day_prefix = day_name.split(' ')[0]
+        for section_name, section_tasks in day_sections.items():
+            if section_name.startswith(day_prefix):
+                day_tasks = section_tasks
+                break
+        
+        # Determine day statuses
+        is_today = (i == day_of_week)
+        is_completed = (i in completed_days)
+        is_partial = (i in partial_days)
+        is_future = False  # Will be set based on day index comparison
+        is_available = is_today
+        is_failed = False  # Will be determined below
+        
+        # Convert to string for completed tasks lookup
+        str_i = str(i)
+        completed_task_indices = completed_tasks.get(str_i, []) if str_i in completed_tasks else []
+        
+        # Determine if this is yesterday and within the grace period
+        is_yesterday = (i == previous_day)
+        within_grace = hours_since_day_change < settings.grace_period_hours
+        
+        # Set future status for days after current day (unless cycling to next week)
+        if (not is_today and not is_completed and not is_partial and 
+            ((i > day_of_week) or (day_of_week == 6 and i == 0))):
+            is_future = True
+        
+        # Set failed status for days before current day that aren't completed/partial
+        # Unless it's yesterday and within grace period
+        if (not is_today and not is_completed and not is_partial and 
+            ((i < day_of_week) or (day_of_week == 0 and i == 6))):
+            if is_yesterday and within_grace:
+                # Yesterday's tasks are still available within grace period
+                is_available = True
+                is_failed = False
+            # Don't mark as failed for new users or if this is the first week
+            elif is_new_user or (i >= session.get('week_start_day', 0) and i <= 6):
+                is_failed = False
+            else:
+                is_failed = True
+                
+        # Also check the day_of_week and week_start_day to determine availability
+        # Make days available from week_start_day forward
+        if not is_today and not is_completed and not is_partial and not is_failed:
+            if session.get('week_start_day', 0) <= i <= day_of_week:
+                is_available = True
+        
+        all_days_tasks.append({
+            'day_index': i,
+            'day_name': day_name,
+            'tasks': day_tasks,
+            'is_today': is_today,
+            'is_completed': is_completed,
+            'is_partial': is_partial,
+            'is_future': is_future,
+            'is_failed': is_failed,
+            'is_available': is_available or (is_yesterday and within_grace),
+            'completed_tasks': completed_task_indices
+        })
+    
+    return render_template(
+        'daily_quests.html',
+        user=g.user,
+        progress_percentage=g.user.get_progress_percentage(),
+        current_day=current_day,
+        all_days_tasks=all_days_tasks,
+        settings=settings
+    )
+
+@bp.route('/api/update_task_status', methods=['POST'])
+@login_required
+def update_task_status():
+    data = request.json
+    day_index = str(data.get('day_index'))
+    task_index = data.get('task_index')
+    is_checked = data.get('is_checked')
+    
+    if day_index is None or task_index is None or is_checked is None:
+        return jsonify({
+            'success': False,
+            'message': 'Missing required fields.'
+        }), 400
+    
+    # Initialize completed tasks if not present
+    if 'completed_tasks' not in session:
+        session['completed_tasks'] = {str(i): [] for i in range(7)}
+    
+    completed_tasks = session.get('completed_tasks', {})
+    
+    # Ensure day index exists in completed tasks
+    if day_index not in completed_tasks:
+        completed_tasks[day_index] = []
+    
+    # Update the task status in session
+    if is_checked and task_index not in completed_tasks[day_index]:
+        completed_tasks[day_index].append(task_index)
+    elif not is_checked and task_index in completed_tasks[day_index]:
+        completed_tasks[day_index].remove(task_index)
+    
+    # Update session
+    session['completed_tasks'] = completed_tasks
+    
+    # Also update database record for persistence
+    day_index_int = int(day_index)
+    quest_record = QuestCompletionRecord.query.filter_by(
+        user_id=g.user.id, 
+        day_index=day_index_int,
+        is_completed=False  # Only update records that aren't fully completed
+    ).order_by(QuestCompletionRecord.completion_date.desc()).first()
+    
+    if not quest_record:
+        # Create a new record if none exists
+        quest_record = QuestCompletionRecord(
+            user_id=g.user.id,
+            day_index=day_index_int,
+            completed_tasks='[]',
+            is_completed=False,
+            is_partial=False
+        )
+        db.session.add(quest_record)
+    
+    # Update the record with the current task status
+    quest_record.set_completed_tasks(completed_tasks[day_index])
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'completed_tasks': completed_tasks[day_index]
+    })
+
+@bp.route('/api/complete_daily_quest', methods=['POST'])
+@login_required
+def complete_daily_quest():
+    """Complete a day's quests based on the number of completed tasks."""
+    data = request.json
+    day_index = data.get('day_index')
+    completed_count = data.get('completed_count')
+    total_count = data.get('total_count')
+    
+    if day_index is None or completed_count is None or total_count is None:
+        return jsonify({
+            'success': False,
+            'message': 'Missing required fields.'
+        }), 400
+    
+    # Get completed days from session
+    if 'completed_days' not in session:
+        session['completed_days'] = []
+    if 'partial_days' not in session:
+        session['partial_days'] = []
+    if 'completed_tasks' not in session:
+        session['completed_tasks'] = {str(i): [] for i in range(7)}
+    
+    completed_days = session.get('completed_days', [])
+    partial_days = session.get('partial_days', [])
+    completed_tasks = session.get('completed_tasks', {})
+    
+    # Get settings
+    settings = db.session.query(QuestSettings).filter_by(user_id=g.user.id).first()
+    if not settings:
+        settings = QuestSettings(user_id=g.user.id)
+        db.session.add(settings)
+        db.session.commit()
+    
+    # Determine if this is a partial or full completion
+    is_partial = completed_count < total_count
+    day_index_int = int(day_index)  # Ensure it's an integer
+    
+    # Update the appropriate completion list in session
+    if is_partial:
+        # Mark as partially completed
+        if day_index_int not in partial_days:
+            partial_days.append(day_index_int)
+            session['partial_days'] = partial_days
+            
+            # Apply a penalty for not completing all tasks
+            day_names = {
+                0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday",
+                4: "Friday", 5: "Saturday", 6: "Sunday"
+            }
+            
+            # Calculate penalty rate using the formula: ((completed_tasks + total_count) / (2 * total_count))
+            # This gives penalty_rate between 0.5 (0 tasks completed) and 1.0 (all tasks completed)
+            penalty_rate = (completed_count + total_count) / (2 * total_count)
+            
+            # Set penalty for exactly 24 hours
+            start_date = datetime.utcnow()
+            end_date = start_date + timedelta(hours=24)
+            
+            # Create a penalty period
+            penalty = PenaltyPeriod(
+                user_id=g.user.id,
+                reason=f"Incomplete {day_names.get(day_index_int, 'daily')} quests ({completed_count}/{total_count})",
+                start_date=start_date,
+                end_date=end_date,
+                penalty_rate=penalty_rate,  # Dynamic penalty based on completion ratio
+                is_active=True,
+                difficulty="daily"  # Special difficulty type for daily quests
+            )
+            db.session.add(penalty)
+    else:
+        # Mark as fully completed
+        if day_index_int not in completed_days:
+            completed_days.append(day_index_int)
+            session['completed_days'] = completed_days
+            
+            # Remove from partial days if it was there
+            if day_index_int in partial_days:
+                partial_days.remove(day_index_int)
+                session['partial_days'] = partial_days
+    
+    # Store completion in database for persistence
+    # First, check for an existing record
+    quest_record = QuestCompletionRecord.query.filter_by(
+        user_id=g.user.id, 
+        day_index=day_index_int
+    ).order_by(QuestCompletionRecord.completion_date.desc()).first()
+    
+    if not quest_record:
+        # Create a new record if none exists
+        quest_record = QuestCompletionRecord(
+            user_id=g.user.id,
+            day_index=day_index_int,
+            is_completed=not is_partial,
+            is_partial=is_partial
+        )
+        # Set completed tasks from session
+        if str(day_index) in completed_tasks:
+            quest_record.set_completed_tasks(completed_tasks[str(day_index)])
+        db.session.add(quest_record)
+    else:
+        # Update existing record
+        quest_record.is_completed = not is_partial
+        quest_record.is_partial = is_partial
+        quest_record.completion_date = datetime.utcnow()
+        # Update completed tasks from session
+        if str(day_index) in completed_tasks:
+            quest_record.set_completed_tasks(completed_tasks[str(day_index)])
+    
+    # Quest completion - No penalty is applied to daily quest XP
+    base_xp = settings.base_xp  # Use base XP from settings
+    
+    # Apply completion formula for XP calculation
+    completion_multiplier = completed_count / total_count if total_count > 0 else 0
+    xp_earned = round(base_xp * completion_multiplier)
+    
+    # Do NOT apply penalty periods to daily quests - Add XP directly
+    g.user.xp += xp_earned
+    
+    # Check if user leveled up
+    old_level = g.user.level
+    if g.user.xp >= g.user.xp_to_next_level:
+        g.user.level += 1
+        g.user.xp -= g.user.xp_to_next_level
+        g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+    
+    db.session.commit()
+    
+    # Check if penalty was applied for incomplete quests
+    penalty_applied = is_partial
+    
+    # Return completion status and XP earned
+    response = {
+        'success': True,
+        'xp_earned': xp_earned,
+        'new_level': g.user.level,
+        'user_level': g.user.level,
+        'user_xp': g.user.xp,
+        'xp_to_next_level': g.user.xp_to_next_level,
+        'level_up': g.user.level > old_level,
+        'completed_days': completed_days,
+        'partial_days': partial_days,
+        'progress': g.user.get_progress_percentage(),
+        'is_partial': is_partial
+    }
+    
+    # Add penalty information if a new penalty was created for incomplete quests
+    if penalty_applied:
+        # Calculate penalty percent for display (needs to be inverted since penalty_rate is the multiplier)
+        penalty_percent = int((1 - penalty_rate) * 100)
+        response['penalty_applied'] = True
+        response['penalty_percent'] = penalty_percent
+        response['penalty_message'] = f"{penalty_percent}% XP penalty applied for incomplete quests"
+    
+    return jsonify(response)
+
+@bp.route('/quest_settings', methods=['GET', 'POST'])
+@login_required
+def quest_settings():
+    # Get user settings or create default
+    settings = db.session.query(QuestSettings).filter_by(user_id=g.user.id).first()
+    if not settings:
+        settings = QuestSettings(user_id=g.user.id)
+        db.session.add(settings)
+        db.session.commit()
+    
+    # Get quest content for editing
+    quest_file_path = settings.custom_quests_path if settings.custom_quests_enabled and settings.custom_quests_path else 'app/daily_quests.md'
+    
+    try:
+        # Read the quest content for editing
+        with open(quest_file_path, 'r') as file:
+            quest_content = file.read()
+    except FileNotFoundError:
+        # Fallback to default if custom file not found
+        with open('app/daily_quests.md', 'r') as file:
+            quest_content = file.read()
+        if settings.custom_quests_enabled:
+            settings.custom_quests_enabled = False
+            db.session.commit()
+            flash_with_notification("Custom quests file not found. Using default quests.", "error")
+    
+    if request.method == 'POST':
+        # Update settings from form
+        settings.base_xp = int(request.form.get('base_xp', 25))
+        settings.skill_increase_min = float(request.form.get('skill_increase_min', 0.2))
+        settings.skill_increase_max = float(request.form.get('skill_increase_max', 1.0))
+        settings.auto_submit = 'auto_submit' in request.form
+        try:
+            settings.grace_period_hours = int(request.form.get('grace_period_hours', 12))
+        except:
+            # Handle case where column doesn't exist yet
+            pass
+        settings.notification_enabled = 'notification_enabled' in request.form
+        settings.custom_quests_enabled = 'custom_quests_enabled' in request.form
+        
+        if settings.custom_quests_enabled:
+            settings.custom_quests_path = request.form.get('custom_quests_path', '')
+        
+        # Update quest content if changed
+        new_content = request.form.get('normalized_quest_content', '')
+        if not new_content:
+            new_content = request.form.get('quest_content', '')
+        
+        # Only save if content has changed
+        if new_content != quest_content:
+            # Determine which file to save to
+            save_path = settings.custom_quests_path if settings.custom_quests_enabled and settings.custom_quests_path else 'app/daily_quests.md'
+            
+            try:
+                with open(save_path, 'w') as file:
+                    file.write(new_content)
+                quest_content = new_content
+                flash_with_notification("Quest content updated successfully!", "success")
+            except Exception as e:
+                flash_with_notification(f"Error saving quest content: {str(e)}", "error")
+        
+        db.session.commit()
+        flash_with_notification("Settings updated successfully!", "success")
+        return redirect(url_for('journey.quest_settings'))
+    
+    return render_template(
+        'quest_settings.html',
+        user=g.user,
+        settings=settings,
+        quest_content=quest_content,
+        progress_percentage=g.user.get_progress_percentage()
+    )
+
+@bp.route('/api/get_notifications')
+def get_notifications():
+    """API endpoint to get and clear notifications from the session."""
+    # Get notifications from session
+    notifications = session.get('browser_notifications', [])
+    
+    # Clear notifications from session
+    session['browser_notifications'] = []
+    
+    # Return as JSON
+    return jsonify({
+        'success': True,
+        'notifications': notifications
+    })
+
+def flash_with_notification(message, category='info', title=None):
+    """Flash a message and add a notification entry for browser notifications."""
+    # DO NOT create a flash message since we'll handle this via browser notifications
+    # This prevents duplicate notifications (one from flash and one from browser notification)
+    
+    # Add to browser notifications in session
+    if 'browser_notifications' not in session:
+        session['browser_notifications'] = []
+    
+    # Add this notification to the session
+    session['browser_notifications'].append({
+        'title': title or 'The Journey',
+        'message': message,
+        'type': category
+    })
+    
+    # Make sure to mark the session as modified so Flask saves it
+    session.modified = True
+
+@bp.route('/api/access_previous_day_tasks', methods=['POST'])
+@login_required
+def access_previous_day_tasks():
+    """Enable access to previous day's tasks if within grace period"""
+    data = request.json
+    day_index = data.get('day_index')
+    
+    if day_index is None:
+        return jsonify({
+            'success': False,
+            'message': 'Missing required fields.'
+        }), 400
+    
+    # Get today's day of the week
+    current_day = datetime.now().weekday()
+    
+    # Only allow access to the previous day (or the requested day if it's the previous day)
+    previous_day = (current_day - 1) % 7
+    
+    if int(day_index) != previous_day:
+        return jsonify({
+            'success': False,
+            'message': 'You can only access the previous day within the grace period.'
+        }), 400
+    
+    # Get settings
+    settings = db.session.query(QuestSettings).filter_by(user_id=g.user.id).first()
+    if not settings:
+        settings = QuestSettings(user_id=g.user.id)
+        db.session.add(settings)
+        db.session.commit()
+    
+    # Calculate if within grace period
+    current_time = datetime.now()
+    previous_day_end = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    hours_since_day_change = (current_time - previous_day_end).total_seconds() / 3600
+    
+    # Get grace period
+    try:
+        grace_period = settings.grace_period_hours
+    except:
+        grace_period = 12  # Default
+    
+    # Check if within grace period
+    if hours_since_day_change < grace_period:
+        # Get session data
+        completed_days = session.get('completed_days', [])
+        partial_days = session.get('partial_days', [])
+        failed_days = session.get('failed_days', [])
+        
+        # If the day is already marked as failed, we can unlock it
+        if previous_day in failed_days:
+            failed_days.remove(previous_day)
+            session['failed_days'] = failed_days
+        
+        # Set session flag to view previous day
+        session['view_previous_day'] = True
+        
+        # Make previous day available
+        return jsonify({
+            'success': True,
+            'message': f'You can now access yesterday\'s tasks. You have {grace_period - hours_since_day_change:.1f} hours remaining in your grace period.',
+            'hours_remaining': grace_period - hours_since_day_change
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': f'Grace period of {grace_period} hours has passed. You can no longer access yesterday\'s tasks.'
+        })
+
+@bp.route('/missions')
+@login_required
+def missions():
+    # Check if user level is at least 7
+    if g.user.level < 7:
+        flash_with_notification('Missions are unlocked at level 7. Keep leveling up!', 'info')
+        return redirect(url_for('journey.dashboard'))
+        
+    active_missions = Mission.query.filter_by(user_id=g.user.id, is_completed=False).order_by(Mission.created_at.desc()).all()
+    completed_missions = Mission.query.filter_by(user_id=g.user.id, is_completed=True).order_by(Mission.completed_at.desc()).all()
+    
+    return render_template(
+        'missions.html', 
+        user=g.user,
+        progress_percentage=g.user.get_progress_percentage(),
+        active_missions=active_missions,
+        completed_missions=completed_missions
+    )
+
+@bp.route('/missions/create', methods=('GET', 'POST'))
+@login_required
+def create_mission():
+    # Check if user level is at least 7
+    if g.user.level < 7:
+        flash_with_notification('Missions are unlocked at level 7. Keep leveling up!', 'info')
+        return redirect(url_for('journey.dashboard'))
+    
+    # Add check for existing active missions
+    active_mission = Mission.query.filter_by(user_id=g.user.id, is_completed=False).first()
+    if active_mission:
+        flash('You must complete your current mission before creating a new one.', 'error')
+        return redirect(url_for('journey.missions'))
+        
+    if request.method == 'POST':
+        title = request.form['title']
+        description = request.form['description']
+        requirements = request.form['requirements']
+        estimated_duration = request.form['estimated_duration']
+        
+        error = None
+        if not title:
+            error = 'Title is required.'
+            
+        if error is None:
+            # Create the mission
+            mission = Mission(
+                title=title,
+                description=description,
+                requirements=requirements,
+                estimated_duration=estimated_duration,
+                user_id=g.user.id
+            )
+            db.session.add(mission)
+            db.session.commit()
+            
+            # Generate the notification using flash_with_notification
+            flash_with_notification(f'Mission "{title}" created successfully! Complete it to earn 500 XP.', 'success')
+            
+            # If this is an AJAX request, send JSON response
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'success': True,
+                    'redirect': url_for('journey.missions')
+                })
+            
+            # Otherwise do a regular redirect
+            return redirect(url_for('journey.missions'))
+        
+        # Handle error
+        flash_with_notification(error, 'error')
+        
+        # If this is an AJAX request, send error response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': False,
+                'error': error
+            }), 400
+    
+    return render_template('create_mission.html', user=g.user)
+
+@bp.route('/missions/<int:id>/complete', methods=['POST'])
+@login_required
+def complete_mission(id):
+    # Check if user level is at least 7
+    if g.user.level < 7:
+        flash_with_notification("You need to be at least level 7 to access missions", "error")
+        return redirect(url_for('journey.dashboard'))
+        
+    mission = Mission.query.filter_by(id=id, user_id=g.user.id).first_or_404()
+    
+    if mission.is_completed:
+        flash_with_notification('This mission has already been completed.', 'warning')
+    else:
+        # Mark mission as completed
+        mission.is_completed = True
+        mission.completed_at = datetime.utcnow()
+        
+        # Reward user with XP
+        actual_xp_earned = g.user.add_xp(mission.xp_reward)
+        
+        # Check for level up
+        old_level = g.user.level
+        while g.user.xp >= g.user.xp_to_next_level:
+            g.user.xp -= g.user.xp_to_next_level
+            g.user.level += 1
+            g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+        
+        db.session.commit()
+        
+        # Show different message if user leveled up or if penalty was applied
+        multiplier = g.user.get_xp_multiplier()
+        penalty_applied = multiplier < 1.0
+        
+        if g.user.level > old_level:
+            if penalty_applied:
+                penalty_percent = int((1 - multiplier) * 100)
+                flash_with_notification(
+                    f'Mission "{mission.title}" completed! You earned {actual_xp_earned} XP ({penalty_percent}% penalty applied) and leveled up to level {g.user.level}!',
+                    'success',
+                    'Level Up!'
+                )
+            else:
+                flash_with_notification(
+                    f'Mission "{mission.title}" completed! You earned {actual_xp_earned} XP and leveled up to level {g.user.level}!',
+                    'success',
+                    'Level Up!'
+                )
+        else:
+            if penalty_applied:
+                penalty_percent = int((1 - multiplier) * 100)
+                flash_with_notification(
+                    f'Mission "{mission.title}" completed! You earned {actual_xp_earned} XP ({penalty_percent}% penalty applied).',
+                    'success',
+                    'Mission Accomplished!'
+                )
+            else:
+                flash_with_notification(
+                    f'Mission "{mission.title}" completed! You earned {actual_xp_earned} XP.',
+                    'success',
+                    'Mission Accomplished!'
+                )
+    
+    return redirect(url_for('journey.missions', mission_completed='true', xp=mission.xp_reward))
+
+@bp.route('/missions/<int:id>/fail', methods=['POST'])
+@login_required
+def fail_mission(id):
+    # Check if user level is at least 7
+    if g.user.level < 7:
+        flash_with_notification("You need to be at least level 7 to access missions", "error")
+        return redirect(url_for('journey.dashboard'))
+        
+    mission = Mission.query.filter_by(id=id, user_id=g.user.id).first_or_404()
+    
+    if mission.is_completed:
+        flash_with_notification('This mission has already been completed.', 'warning')
+    else:
+        # Apply a penalty for failing the mission
+        start_date = datetime.utcnow()
+        end_date = start_date + timedelta(days=9)  # 9 days penalty for mission failure
+        
+        # Create a penalty period with 40% XP multiplier
+        penalty = PenaltyPeriod(
+            user_id=g.user.id,
+            reason=f"Failed mission: {mission.title}",
+            start_date=start_date,
+            end_date=end_date,
+            penalty_rate=0.4,  # 40% XP multiplier (60% penalty)
+            is_active=True,
+            difficulty="mission"  # Special difficulty type for mission penalties
+        )
+        db.session.add(penalty)
+        
+        # Remove the mission
+        db.session.delete(mission)
+        db.session.commit()
+        
+        flash_with_notification(
+            f'Mission failed! Your XP gains will be reduced by 60% for 9 days.',
+            'warning',
+            'Penalty Applied'
+        )
+    
+    return redirect(url_for('journey.missions'))
+
+@bp.route('/education')
+@login_required
+def education():
+    # Get or create default subjects
+    subjects = Subject.query.filter_by(user_id=g.user.id).all()
+    
+    if not subjects:
+        # Create default subjects
+        default_subjects = [
+            {'name': 'Physics', 'description': 'Study of matter, energy, and the interactions between them'},
+            {'name': 'Chemistry', 'description': 'Study of substances, their properties, and reactions'},
+            {'name': 'Mathematics', 'description': 'Study of numbers, quantities, and shapes'}
+        ]
+        
+        for subject_data in default_subjects:
+            subject = Subject(
+                name=subject_data['name'],
+                description=subject_data['description'],
+                user_id=g.user.id
+            )
+            db.session.add(subject)
+        
+        db.session.commit()
+        subjects = Subject.query.filter_by(user_id=g.user.id).all()
+        
+        # Add some default topics for each subject
+        physics = Subject.query.filter_by(user_id=g.user.id, name='Physics').first()
+        if physics:
+            physics_topics = ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics', 'Modern Physics']
+            for topic_name in physics_topics:
+                topic = Topic(name=topic_name, subject_id=physics.id, is_completed=False)
+                db.session.add(topic)
+        
+        chemistry = Subject.query.filter_by(user_id=g.user.id, name='Chemistry').first()
+        if chemistry:
+            chemistry_topics = ['Atomic Structure', 'Chemical Bonding', 'Acids and Bases', 'Organic Chemistry', 'Thermochemistry']
+            for topic_name in chemistry_topics:
+                topic = Topic(name=topic_name, subject_id=chemistry.id, is_completed=False)
+                db.session.add(topic)
+        
+        math = Subject.query.filter_by(user_id=g.user.id, name='Mathematics').first()
+        if math:
+            math_topics = ['Algebra', 'Calculus', 'Statistics', 'Linear Algebra', 'Differential Equations']
+            for topic_name in math_topics:
+                topic = Topic(name=topic_name, subject_id=math.id, is_completed=False)
+                db.session.add(topic)
+                
+        db.session.commit()
+    
+    # Prepare data for the template
+    subject_data = []
+    for subject in subjects:
+        topics = Topic.query.filter_by(subject_id=subject.id).all()
+        
+        # Get subtopics for each topic
+        topic_data = []
+        for topic in topics:
+            subtopics = Subtopic.query.filter_by(topic_id=topic.id).all()
+            topic_data.append({
+                'id': topic.id,
+                'name': topic.name,
+                'description': topic.description,
+                'is_completed': topic.is_completed,
+                'progress': topic.get_progress(),
+                'subtopics': subtopics
+            })
+            
+        subject_data.append({
+            'id': subject.id,
+            'name': subject.name,
+            'description': subject.description,
+            'progress': subject.get_progress(),
+            'topics': topic_data
+        })
+    
+    # Get study session data for the chart
+    today = datetime.now().date()
+    study_sessions = StudySession.query.filter_by(user_id=g.user.id).filter(
+        StudySession.date >= today - timedelta(days=6)
+    ).order_by(StudySession.date).all()
+    
+    # Process data for the chart
+    dates = [(today - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6, -1, -1)]
+    hours_by_date = {date: 0 for date in dates}
+    
+    for session in study_sessions:
+        session_date = session.date.strftime('%Y-%m-%d')
+        if session_date in hours_by_date:
+            hours_by_date[session_date] += session.hours
+    
+    chart_labels = [datetime.strptime(date, '%Y-%m-%d').strftime('%a, %b %d') for date in dates]
+    chart_data = [hours_by_date[date] for date in dates]
+    
+    study_data = {
+        'labels': chart_labels,
+        'data': chart_data
+    }
+    
+    # Create a form for CSRF token
+    form = StudySessionForm()
+    
+    return render_template('education.html', 
+                           subjects=subject_data, 
+                           study_data=json.dumps(study_data), 
+                           form=form, 
+                           datetime=datetime, 
+        user=g.user,
+        progress_percentage=g.user.get_progress_percentage(),
+                           now=datetime.now())
+
+@bp.route('/education/record_study', methods=['POST'])
+@login_required
+def record_study():
+    try:
+        date_str = request.form.get('date')
+        hours = float(request.form.get('hours'))
+        notes = request.form.get('notes', '')
+        
+        # Validate inputs
+        if not date_str or not hours:
+            flash('Date and hours are required')
+            return redirect(url_for('journey.education'))
+        
+        # Parse date
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid date format')
+            return redirect(url_for('journey.education'))
+        
+        # Always use General Study
+        general_study = Subject.query.filter_by(user_id=g.user.id, name='General Study').first()
+        
+        # Create one if it doesn't exist
+        if not general_study:
+            general_study = Subject(
+                name='General Study',
+                description='General studies not associated with a specific subject',
+                user_id=g.user.id
+            )
+            db.session.add(general_study)
+            db.session.commit()
+            
+        subject_id = general_study.id
+        
+        # Create study session
+        study_session = StudySession(
+            hours=hours,
+            date=date,
+            notes=notes,
+            user_id=g.user.id,
+            subject_id=subject_id
+        )
+        
+        db.session.add(study_session)
+        db.session.commit()
+        
+        # Award XP for studying
+        xp_reward = int(hours * 15)  # 15 XP per hour of study
+        actual_xp = g.user.add_xp(xp_reward)
+        
+        # Show success message
+        flash(f'Study session recorded! You earned {actual_xp} XP')
+        
+        return redirect(url_for('journey.education'))
+            
+    except Exception as e:
+        flash(f'Error recording study session: {str(e)}')
+        return redirect(url_for('journey.education'))
+
+@bp.route('/education/toggle_topic/<int:topic_id>', methods=['POST'])
+@login_required
+def toggle_topic(topic_id):
+    topic = Topic.query.get_or_404(topic_id)
+    
+    # Check if topic belongs to the current user
+    subject = Subject.query.get_or_404(topic.subject_id)
+    if subject.user_id != g.user.id:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'You do not have permission to modify this topic'})
+        flash('You do not have permission to modify this topic')
+        return redirect(url_for('journey.education'))
+    
+    # Get the current completion status
+    was_completed = topic.is_completed
+    
+    # If topic is already completed, don't allow unchecking
+    if was_completed:
+        if request.is_json:
+            return jsonify({
+                'success': False, 
+                'message': 'Completed topics cannot be unchecked. Progress can only move forward.',
+                'is_completed': True
+            })
+        flash('Completed topics cannot be unchecked. Progress can only move forward.')
+        return redirect(url_for('journey.education'))
+    
+    # Toggle completed status - only allow completing, not uncompleting
+    topic.is_completed = True
+    
+    message = ""
+    level_up = False
+    
+    # Award XP for completing the topic
+    actual_xp = g.user.add_xp(15)
+    message = f'Topic "{topic.name}" marked as completed! +{actual_xp} XP'
+    
+    # Check if user leveled up
+    if g.user.xp >= g.user.xp_to_next_level:
+        old_level = g.user.level
+        g.user.level += 1
+        g.user.xp -= g.user.xp_to_next_level
+        g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+        level_up = True
+        message += f' Congratulations! You leveled up to level {g.user.level}!'
+    
+    # Mark all subtopics as completed too
+    subtopics = Subtopic.query.filter_by(topic_id=topic.id).all()
+    for subtopic in subtopics:
+        if not subtopic.is_completed:
+            subtopic.is_completed = True
+            subtopic.completed_at = datetime.utcnow()
+    
+    # Commit all changes to database
+    db.session.commit()
+    
+    if not request.is_json:
+        flash(message)
+    
+    # Reload subject to get updated progress
+    subject = Subject.query.get_or_404(topic.subject_id)
+    progress = subject.get_progress()
+    
+    # Get topic progress
+    topic_progress = topic.get_progress()
+    
+    if request.is_json:
+        response = {
+            'success': True,
+            'topic_id': topic.id,
+            'is_completed': topic.is_completed,
+            'topic_progress': topic_progress,
+            'subject_id': subject.id,
+            'progress': progress,
+            'message': message,
+            'user_xp': g.user.xp,
+            'xp_to_next': g.user.xp_to_next_level,
+            'level': g.user.level,
+            'level_up': level_up
+        }
+        return jsonify(response)
+    
+    return redirect(url_for('journey.education'))
+
+@bp.route('/add_subject', methods=['POST'])
+@login_required
+def add_subject():
+    name = request.form.get('subject_name')
+    description = request.form.get('subject_description', '')
+    
+    if not name:
+        flash('Subject name is required')
+        return redirect(url_for('journey.education'))
+    
+    # Check if subject already exists
+    existing_subject = Subject.query.filter_by(user_id=g.user.id, name=name).first()
+    
+    if existing_subject:
+        flash('A subject with this name already exists')
+        return redirect(url_for('journey.education'))
+    else:
+        # Create new subject
+        subject = Subject(
+            name=name,
+            description=description,
+            user_id=g.user.id
+        )
+        db.session.add(subject)
+        db.session.commit()
+        
+        # Award XP for adding a new subject
+        actual_xp = g.user.add_xp(10)
+        message = f'Subject added successfully! +{actual_xp} XP'
+        
+        # Check if user leveled up
+        level_up = False
+        if g.user.xp >= g.user.xp_to_next_level:
+            old_level = g.user.level
+            g.user.level += 1
+            g.user.xp -= g.user.xp_to_next_level
+            g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+            level_up = True
+            message += f' Congratulations! You leveled up to level {g.user.level}!'
+        
+        db.session.commit()
+        flash(message)
+    
+    return redirect(url_for('journey.education'))
+
+@bp.route('/add_topic', methods=['POST'])
+@login_required
+def add_topic():
+    subject_id = request.form.get('subject_id')
+    topic_names_text = request.form.get('topic_names')
+    description = request.form.get('topic_description', '')
+    
+    if not subject_id or not topic_names_text:
+        flash('Subject and at least one topic name are required')
+        return redirect(url_for('journey.education'))
+    
+    # Check if subject exists and belongs to user
+    subject = Subject.query.filter_by(id=subject_id, user_id=g.user.id).first()
+    
+    if not subject:
+        flash('Subject not found')
+        return redirect(url_for('journey.education'))
+    
+    # Process multiple topics
+    topic_names = [name.strip() for name in topic_names_text.split('\n') if name.strip()]
+    
+    if not topic_names:
+        flash('Please enter at least one topic name')
+        return redirect(url_for('journey.education'))
+    
+    topics_added = 0
+    topics_skipped = 0
+    
+    for name in topic_names:
+        # Check if topic already exists
+        existing_topic = Topic.query.filter_by(subject_id=subject_id, name=name).first()
+        
+        if existing_topic:
+            topics_skipped += 1
+            continue
+        
+        # Create new topic
+        topic = Topic(
+            name=name,
+            description=description,
+            subject_id=subject_id,
+            is_completed=False
+        )
+        db.session.add(topic)
+        topics_added += 1
+    
+    if topics_added > 0:
+        db.session.commit()
+                
+        # Award XP for adding new topics
+        xp_awarded = topics_added * 5
+        actual_xp = g.user.add_xp(xp_awarded)
+        
+        message = ""
+        if topics_skipped > 0:
+            message = f'Added {topics_added} new topics successfully! +{actual_xp} XP. {topics_skipped} topics were skipped (already exist).'
+        else:
+            message = f'Added {topics_added} new topics successfully! +{actual_xp} XP'
+        
+        # Check if user leveled up
+        if g.user.xp >= g.user.xp_to_next_level:
+            old_level = g.user.level
+            g.user.level += 1
+            g.user.xp -= g.user.xp_to_next_level
+            g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+            message += f' Congratulations! You leveled up to level {g.user.level}!'
+        
+        db.session.commit()
+        flash(message)
+    else:
+        if topics_skipped > 0:
+            flash(f'No new topics added. All {topics_skipped} topics already exist.')
+        else:
+            flash('No topics were added')
+    
+    return redirect(url_for('journey.education'))
+
+@bp.route('/add_subtopic', methods=['POST'])
+@login_required
+def add_subtopic():
+    topic_id = request.form.get('topic_id')
+    subtopic_names_text = request.form.get('subtopic_names')
+    description = request.form.get('subtopic_description', '')
+    
+    if not topic_id or not subtopic_names_text:
+        flash('Topic and at least one subtopic name are required')
+        return redirect(url_for('journey.education'))
+    
+    # Check if topic exists and belongs to user
+    topic = Topic.query.get_or_404(topic_id)
+    subject = Subject.query.get_or_404(topic.subject_id)
+    
+    if subject.user_id != g.user.id:
+        flash('Topic not found or does not belong to you')
+        return redirect(url_for('journey.education'))
+    
+    # Process multiple subtopics
+    subtopic_names = [name.strip() for name in subtopic_names_text.split('\n') if name.strip()]
+    
+    if not subtopic_names:
+        flash('Please enter at least one subtopic name')
+        return redirect(url_for('journey.education'))
+    
+    subtopics_added = 0
+    subtopics_skipped = 0
+    
+    for name in subtopic_names:
+        # Check if subtopic already exists
+        existing_subtopic = Subtopic.query.filter_by(topic_id=topic_id, name=name).first()
+        
+        if existing_subtopic:
+            subtopics_skipped += 1
+            continue
+        
+        # Create new subtopic
+        subtopic = Subtopic(
+            name=name,
+            description=description,
+            topic_id=topic_id,
+            is_completed=False
+        )
+        db.session.add(subtopic)
+        subtopics_added += 1
+    
+    if subtopics_added > 0:
+                    db.session.commit()
+                    
+        # Award XP for adding new subtopics
+        xp_awarded = subtopics_added * 3
+        actual_xp = g.user.add_xp(xp_awarded)
+        
+        message = ""
+        if subtopics_skipped > 0:
+            message = f'Added {subtopics_added} new subtopics successfully! +{actual_xp} XP. {subtopics_skipped} subtopics were skipped (already exist).'
+        else:
+            message = f'Added {subtopics_added} new subtopics successfully! +{actual_xp} XP'
+        
+        # Check if user leveled up
+        if g.user.xp >= g.user.xp_to_next_level:
+            old_level = g.user.level
+            g.user.level += 1
+            g.user.xp -= g.user.xp_to_next_level
+            g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+            message += f' Congratulations! You leveled up to level {g.user.level}!'
+        
+        db.session.commit()
+        flash(message)
+    else:
+        if subtopics_skipped > 0:
+            flash(f'No new subtopics added. All {subtopics_skipped} subtopics already exist.')
+        else:
+            flash('No subtopics were added')
+    
+    return redirect(url_for('journey.education'))
+
+@bp.route('/education/toggle_subtopic/<int:subtopic_id>', methods=['POST'])
+@login_required
+def toggle_subtopic(subtopic_id):
+    subtopic = Subtopic.query.get_or_404(subtopic_id)
+    
+    # Check if subtopic belongs to the current user
+    topic = Topic.query.get_or_404(subtopic.topic_id)
+    subject = Subject.query.get_or_404(topic.subject_id)
+    
+    if subject.user_id != g.user.id:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'You do not have permission to modify this subtopic'})
+        flash('You do not have permission to modify this subtopic')
+        return redirect(url_for('journey.education'))
+    
+    # Toggle completed status
+    was_completed = subtopic.is_completed
+    subtopic.is_completed = not was_completed
+    
+    # Commit the change immediately to ensure it's saved
+        db.session.commit()
+        
+    message = ""
+    level_up = False
+    total_xp_earned = 0
+    
+    # Award XP if newly completed
+    if not was_completed and subtopic.is_completed:
+        actual_xp = g.user.add_xp(5)
+        total_xp_earned += actual_xp
+        message = f'Subtopic "{subtopic.name}" marked as completed! +{actual_xp} XP'
+        
+        # Check if user leveled up
+        if g.user.xp >= g.user.xp_to_next_level:
+            old_level = g.user.level
+            g.user.level += 1
+            g.user.xp -= g.user.xp_to_next_level
+            g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+            level_up = True
+            db.session.commit()  # Commit level change
+        
+        if not request.is_json:
+            flash(message)
+    elif was_completed and not subtopic.is_completed:
+        message = f'Subtopic "{subtopic.name}" marked as not completed'
+        if not request.is_json:
+            flash(message)
+    
+    # Check if all subtopics are now completed, and if so, mark the topic as complete
+    all_subtopics = Subtopic.query.filter_by(topic_id=topic.id).all()
+    all_completed = all(subtopic.is_completed for subtopic in all_subtopics)
+    
+    if all_completed and not topic.is_completed:
+        # Mark topic as complete
+        topic.is_completed = True
+        db.session.commit()  # Commit topic completion immediately
+        
+        # Award XP for completing the topic indirectly
+        additional_xp = g.user.add_xp(15)
+        total_xp_earned += additional_xp
+        additional_message = f'Topic "{topic.name}" completed automatically! +{additional_xp} XP'
+        
+        # Check if user leveled up (again, in case the additional XP triggers it)
+        if g.user.xp >= g.user.xp_to_next_level:
+            old_level = g.user.level
+            g.user.level += 1
+            g.user.xp -= g.user.xp_to_next_level
+            g.user.xp_to_next_level = 100 + 10 * g.user.level  # New linear formula
+            level_up = True
+            additional_message += f' Congratulations! You leveled up to level {g.user.level}!'
+        
+        message = message + " " + additional_message if message else additional_message
+        if not request.is_json:
+            flash(additional_message)
+        
+        db.session.commit()  # Commit all changes
+    elif not all_completed and topic.is_completed:
+        # If any subtopic is uncompleted but topic was complete, uncomplete the topic
+        topic.is_completed = False
+        db.session.commit()  # Commit the topic status change
+    
+    # Make sure all changes are committed
+    db.session.commit()
+    
+    # Reload topic and subject to get updated progress
+    topic = Topic.query.get_or_404(subtopic.topic_id)
+    topic_progress = topic.get_progress()
+    subject = Subject.query.get_or_404(topic.subject_id)
+    subject_progress = subject.get_progress()
+    
+    if request.is_json:
+        response = {
+            'success': True,
+            'subtopic_id': subtopic.id,
+            'is_completed': subtopic.is_completed,
+            'topic_id': topic.id,
+            'topic_progress': topic_progress,
+            'topic_is_completed': topic.is_completed,
+            'subject_id': subject.id,
+            'subject_progress': subject_progress,
+            'message': message,
+            'user_xp': g.user.xp,
+            'xp_to_next': g.user.xp_to_next_level,
+            'level': g.user.level,
+            'level_up': level_up,
+            'xp_earned': total_xp_earned
+        }
+        return jsonify(response)
+    
+    return redirect(url_for('journey.education'))
+
+@bp.route('/delete_subject/<int:subject_id>', methods=['POST'])
+@login_required
+def delete_subject(subject_id):
+    subject = Subject.query.get_or_404(subject_id)
+    
+    # Check if subject belongs to the current user
+    if subject.user_id != g.user.id:
+        flash('You do not have permission to delete this subject')
+        return redirect(url_for('journey.education'))
+    
+    # Get topics to find subtopics
+    topics = Topic.query.filter_by(subject_id=subject_id).all()
+    
+    # Delete all associated subtopics and study sessions
+    for topic in topics:
+        Subtopic.query.filter_by(topic_id=topic.id).delete()
+    
+    # Delete all study sessions associated with this subject
+    StudySession.query.filter_by(subject_id=subject_id).delete()
+    
+    # Delete all topics
+    Topic.query.filter_by(subject_id=subject_id).delete()
+    
+    # Delete the subject
+    db.session.delete(subject)
+    db.session.commit()
+    
+    flash(f'Subject "{subject.name}" and all associated topics and subtopics have been deleted')
+    return redirect(url_for('journey.education'))
+
+@bp.route('/delete_topic/<int:topic_id>', methods=['POST'])
+@login_required
+def delete_topic(topic_id):
+    topic = Topic.query.get_or_404(topic_id)
+    
+    # Check if topic belongs to the current user
+    subject = Subject.query.get_or_404(topic.subject_id)
+    if subject.user_id != g.user.id:
+        flash('You do not have permission to delete this topic')
+        return redirect(url_for('journey.education'))
+    
+    # Store topic name for flash message
+    topic_name = topic.name
+    
+    # Delete all associated subtopics
+    Subtopic.query.filter_by(topic_id=topic_id).delete()
+    
+    # Delete the topic
+    db.session.delete(topic)
+    db.session.commit()
+    
+    flash(f'Topic "{topic_name}" and all associated subtopics have been deleted')
+    return redirect(url_for('journey.education'))
+
+@bp.route('/delete_subtopic/<int:subtopic_id>', methods=['POST'])
+@login_required
+def delete_subtopic(subtopic_id):
+    subtopic = Subtopic.query.get_or_404(subtopic_id)
+    
+    # Check if subtopic belongs to the current user
+    topic = Topic.query.get_or_404(subtopic.topic_id)
+    subject = Subject.query.get_or_404(topic.subject_id)
+    if subject.user_id != g.user.id:
+        flash('You do not have permission to delete this subtopic')
+        return redirect(url_for('journey.education'))
+    
+    # Store subtopic name for flash message
+    subtopic_name = subtopic.name
+    
+    # Delete the subtopic
+    db.session.delete(subtopic)
+    db.session.commit()
+    
+    flash(f'Subtopic "{subtopic_name}" has been deleted')
+    return redirect(url_for('journey.education'))
+
+@bp.route('/api/study_hours', methods=['POST'])
+@login_required
+def get_study_hours():
+    data = request.get_json()
+    view = data.get('view', 'weekly')
+    
+    if view == 'weekly':
+        # Get data for the last 7 days
+        today = datetime.now().date()
+        dates = [(today - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6, -1, -1)]
+        
+        # Get all study sessions for the user in the past 7 days
+        study_sessions = StudySession.query.filter_by(user_id=g.user.id).filter(
+            StudySession.date >= today - timedelta(days=6)  # Get only sessions from the past 7 days
+        ).order_by(StudySession.date).all()
+        
+        # Process data for the chart, initialize with all 7 days
+        hours_by_date = {}
+        
+        # Initialize with the last 7 days to ensure they appear even if no data
+        for date in dates:
+            hours_by_date[date] = 0
+        
+        # Add hours for each day from the sessions
+        for session in study_sessions:
+            session_date = session.date.strftime('%Y-%m-%d')
+            if session_date in hours_by_date:
+                hours_by_date[session_date] += session.hours
+        
+        # Use the ordered dates to keep the correct sequence
+        chart_labels = [datetime.strptime(date, '%Y-%m-%d').strftime('%a, %b %d') for date in dates]
+        chart_data = [hours_by_date[date] for date in dates]
+        
+    return jsonify({
+            'success': True,
+            'labels': chart_labels,
+            'data': chart_data
+        })
+    
+    elif view == 'monthly':
+        # Get month and year from request, default to current month
+        month = data.get('month', datetime.now().month)
+        year = data.get('year', datetime.now().year)
+        
+        # Create date for the first day of the specified month
+        current_month = datetime(year, month, 1).date()
+        
+        # Calculate days in the specified month
+        if month == 12:
+            next_month = datetime(year + 1, 1, 1).date()
+        else:
+            next_month = datetime(year, month + 1, 1).date()
+        days_in_month = (next_month - current_month).days
+        
+        # Create a list of all days in the specified month
+        month_dates = [(current_month + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days_in_month)]
+        
+        # Get all study sessions for the user in the specified month
+        study_sessions = StudySession.query.filter_by(user_id=g.user.id).filter(
+            StudySession.date >= current_month,
+            StudySession.date < next_month
+        ).order_by(StudySession.date).all()
+        
+        # Initialize hours for each day of the month
+        hours_by_date = {date: 0 for date in month_dates}
+        
+        # Add study hours for each day
+        for session in study_sessions:
+            session_date = session.date.strftime('%Y-%m-%d')
+            if session_date in hours_by_date:
+                hours_by_date[session_date] += session.hours
+        
+        # Format labels to show just the day number
+        chart_labels = [datetime.strptime(date, '%Y-%m-%d').strftime('%d') for date in month_dates]
+        chart_data = [hours_by_date[date] for date in month_dates]
+        
+        # Add month name to the response for display purposes
+        month_name = current_month.strftime('%B %Y')
+        
+        return jsonify({
+            'success': True,
+            'labels': chart_labels,
+            'data': chart_data,
+            'month': month_name,
+            'month_number': month,
+            'year': year
+        })
+    
+    elif view == 'yearly':
+        # Get requested year from request, default to current year
+        year = data.get('year', datetime.now().year)
+        
+        # Create a list of all months in the year
+        months = []
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        
+        # Get all study sessions for the user in the requested year
+        start_date = datetime(year, 1, 1).date()
+        end_date = datetime(year + 1, 1, 1).date()
+        
+        study_sessions = StudySession.query.filter_by(user_id=g.user.id).filter(
+            StudySession.date >= start_date,
+            StudySession.date < end_date
+        ).order_by(StudySession.date).all()
+        
+        # Initialize hours for each month
+        hours_by_month = {month: 0 for month in range(1, 13)}
+        
+        # Add study hours for each month
+        for session in study_sessions:
+            month = session.date.month
+            hours_by_month[month] += session.hours
+        
+        # Prepare data for chart
+        chart_labels = month_names
+        chart_data = [hours_by_month[m] for m in range(1, 13)]
+        
+        return jsonify({
+            'success': True,
+            'labels': chart_labels,
+            'data': chart_data,
+            'year': year
+        })
+    
+    return jsonify({
+        'success': False,
+        'message': 'Invalid view type specified'
+    })
+
+@bp.route('/api/add_skill', methods=['POST'])
+@login_required
+def add_skill():
+    if not request.is_json:
+        return jsonify({'success': False, 'message': 'Invalid request format'}), 400
+    
+    data = request.json
+    category = data.get('category', '')
+    name = data.get('name', '').strip()
+    icon = data.get('icon', '').strip()
+    description = data.get('description', '').strip()
+    category_name = data.get('category_name', '').strip()
+    category_color = data.get('category_color', '')
+    
+    # Validate inputs
+    if not category:
+        return jsonify({'success': False, 'message': 'Category is required'}), 400
+    
+    if not name:
+        return jsonify({'success': False, 'message': 'Skill name is required'}), 400
+    
+    if not icon:
+        return jsonify({'success': False, 'message': 'Skill icon is required'}), 400
+    
+    # Add the custom skill to the database - SIMPLIFIED
+    try:
+        # Create a new skill with all fields
+        new_skill = CustomSkill(
+            user_id=g.user.id,
+            category=category,
+            category_name=category_name,
+            category_color=category_color,
+            name=name,
+            icon=icon,
+            description=description,
+            level=1.0  # Start at level 1
+        )
+        
+        db.session.add(new_skill)
+        db.session.commit()
+        
+        # Get the skill ID
+        skill_id = new_skill.id
+        
+        # If we got here, it worked
+        return jsonify({
+            'success': True,
+            'message': 'Skill added successfully',
+            'skill_id': skill_id
+        })
+    except Exception as e:
+        db.session.rollback()
+        error_message = str(e)
+        
+        # Try direct database insertion as a fallback
+        try:
+            print(f"SQLAlchemy error: {error_message}")
+            print("Attempting direct SQLite insertion...")
+            
+            # Get the database path
+            import os
+            import sqlite3
+            from datetime import datetime
+            
+            # Connect to the database
+            engine = db.engine
+            db_path = engine.url.database
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Disable foreign key constraints temporarily
+            cursor.execute("PRAGMA foreign_keys = OFF")
+            
+            # Current timestamp
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Insert with all fields
+            cursor.execute(
+                "INSERT INTO custom_skills (user_id, category, category_name, category_color, name, icon, description, level) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (g.user.id, category, category_name, category_color, name, icon, description, 1.0)
+            )
+            
+            # Commit and get the ID
+            conn.commit()
+            skill_id = cursor.lastrowid
+            
+            # Close connection
+            conn.close()
+            
+            print(f"Successfully added skill directly via SQLite: {skill_id}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Skill added successfully (SQLite fallback)',
+                'skill_id': skill_id
+            })
+            
+        except Exception as sqlite_error:
+            print(f"SQLite fallback also failed: {sqlite_error}")
+            
+        return jsonify({'success': False, 'message': f'Error adding skill: {error_message}'}), 500

@@ -1,0 +1,695 @@
+/* Mission Theme CSS - Special styling for when a mission is active */
+
+/* Font imports */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+/* Font declarations for mission theme */
+@font-face {
+    font-family: 'Azonix';
+    src: url('../fonts/mission_fonts/azonix/Azonix.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Supercharge';
+    src: url('../fonts/mission_fonts/supercharge/Supercharge.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Marine';
+    src: url('../fonts/mission_fonts/marine-corps/MarineCorps.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Fallback fonts */
+@import url('https://fonts.googleapis.com/css2?family=Quantico:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Saira+Stencil+One&display=swap');
+
+/* Mission Mode Active Body Styles */
+body.mission-active {
+    background-color: #0a0a0c;
+    position: relative;
+    overflow-x: hidden;
+    background-image: 
+        linear-gradient(to bottom, rgba(20, 20, 20, 0.9), rgba(10, 10, 12, 0.95)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 100 100'%3E%3Crect fill='%23dc2626' fill-opacity='0.05' width='20' height='20' x='0' y='0'/%3E%3C/svg%3E");
+}
+
+/* Apply mission theme to all content sections */
+body.mission-active .dashboard-content {
+    position: relative;
+    z-index: 2;
+}
+
+/* Enhance all cards when mission mode is active */
+body.mission-active .level-display,
+body.mission-active .objective-card,
+body.mission-active .stats-overview,
+body.mission-active .quest-list,
+body.mission-active .skill-card,
+body.mission-active .missions-container > div {
+    border-color: rgba(220, 38, 38, 0.3);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 10px rgba(220, 38, 38, 0.2);
+    transition: all 0.3s ease;
+}
+
+body.mission-active .level-display:hover,
+body.mission-active .objective-card:hover,
+body.mission-active .stats-overview:hover,
+body.mission-active .quest-list:hover,
+body.mission-active .skill-card:hover,
+body.mission-active .missions-container > div:hover {
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(220, 38, 38, 0.3);
+}
+
+/* Mission theme for progress bars */
+body.mission-active .progress-bar {
+    background: linear-gradient(90deg, #991b1b, #dc2626);
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
+}
+
+/* Mission theme for buttons */
+body.mission-active button:not(.mission-action-btn),
+body.mission-active .button, 
+body.mission-active .btn,
+body.mission-active input[type="submit"] {
+    border-color: rgba(220, 38, 38, 0.4);
+    transition: all 0.3s ease;
+}
+
+body.mission-active button:not(.mission-action-btn):hover,
+body.mission-active .button:hover, 
+body.mission-active .btn:hover,
+body.mission-active input[type="submit"]:hover {
+    border-color: rgba(220, 38, 38, 0.7);
+    box-shadow: 0 0 15px rgba(220, 38, 38, 0.4);
+}
+
+/* Mission Alert Bar - new design with Azonix font */
+.mission-alert {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, 
+        rgba(0, 0, 0, 0.9), 
+        rgba(139, 0, 0, 0.9), 
+        rgba(0, 0, 0, 0.9));
+    padding: 10px 0;
+    z-index: 1500;
+    box-shadow: 0 0 25px rgba(139, 0, 0, 0.7);
+    font-family: 'Azonix', 'Quantico', sans-serif;
+    text-align: center;
+    color: #ffffff;
+    border-bottom: 2px solid rgba(255, 0, 0, 0.7);
+}
+
+.mission-alert-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+}
+
+.mission-alert-content::before,
+.mission-alert-content::after {
+    content: '';
+    position: absolute;
+    width: 40px;
+    height: 2px;
+    background: rgba(255, 0, 0, 0.7);
+    animation: alertBarShine 2s infinite;
+}
+
+.mission-alert-content::before {
+    left: calc(50% - 120px);
+}
+
+.mission-alert-content::after {
+    right: calc(50% - 120px);
+}
+
+.mission-alert-icon {
+    font-size: 18px;
+    animation: missionIconPulse 2s infinite;
+    color: #ff0000;
+}
+
+.mission-alert-text {
+    font-size: 16px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+    position: relative;
+}
+
+.mission-alert-text::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 0, 0, 0.7);
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: textUnderline 4s infinite;
+}
+
+/* Red scanline overlay effect */
+.mission-scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(220, 38, 38, 0.05),
+        rgba(220, 38, 38, 0.05) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+    z-index: 1001;
+    opacity: 0.4;
+}
+
+/* Pulsating vignette effect */
+.mission-vignette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, 
+        rgba(0, 0, 0, 0) 0%, 
+        rgba(0, 0, 0, 0) 50%, 
+        rgba(220, 38, 38, 0.3) 100%
+    );
+    pointer-events: none;
+    z-index: 999;
+    animation: vignetteBreathing 5s infinite;
+}
+
+/* Random digital glitch effect */
+.mission-glitch {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect x="0" y="0" width="100" height="100" fill="none"/></svg>');
+    pointer-events: none;
+    z-index: 998;
+    opacity: 0;
+    mix-blend-mode: overlay;
+}
+
+/* Floating particles in background */
+.mission-particles {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 997;
+}
+
+.mission-particle {
+    position: absolute;
+    background-color: rgba(220, 38, 38, 0.5);
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.3;
+    animation: particleFloat linear infinite;
+}
+
+/* Mission header styling */
+.mission-header {
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 20px;
+    border-bottom: 2px solid rgba(139, 0, 0, 0.7);
+    position: relative;
+    font-family: 'Marine', 'Saira Stencil One', sans-serif;
+    text-transform: uppercase;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: #ffffff;
+    text-shadow: 2px 2px 0px rgba(139, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+}
+
+.mission-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.1), 
+        transparent);
+    animation: headerShine 4s infinite;
+}
+
+/* Mission text styling */
+.mission-text {
+    font-family: 'Space Mono', monospace;
+    color: #f8f8f8;
+    line-height: 1.6;
+}
+
+/* Pulsating button effect for mission actions - updated design */
+.mission-action-btn {
+    background: linear-gradient(135deg, #8b0000, #ff0000);
+    color: white;
+    font-family: 'Marine', 'Saira Stencil One', sans-serif;
+    padding: 12px 24px;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: bold;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(139, 0, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+.mission-action-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: missionBtnShine 3s infinite;
+}
+
+.mission-action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.7);
+}
+
+.mission-action-btn:active {
+    transform: translateY(1px);
+}
+
+/* Mission card - redesigned with new fonts and style */
+.mission-card {
+    background: linear-gradient(135deg, 
+        rgba(30, 41, 59, 0.95), 
+        rgba(17, 24, 39, 0.95));
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+    border-left: 5px solid #dc2626;
+    min-height: 200px; /* Ensure enough space for requirements */
+    position: relative;
+    z-index: 1;
+}
+
+/* Top border design */
+.mission-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, 
+        rgba(139, 0, 0, 0), 
+        rgba(255, 0, 0, 1), 
+        rgba(139, 0, 0, 0));
+    z-index: 2;
+}
+
+/* Side border designs */
+.mission-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: rgba(139, 0, 0, 0.7);
+    z-index: 2;
+}
+
+/* Mission Requirements Styles */
+.mission-requirements {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border-left: 3px solid #dc2626;
+    position: relative;
+    z-index: 1;
+}
+
+.mission-requirements-title {
+    font-size: 1.1rem;
+    color: #f8fafc;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 5px;
+}
+
+.mission-requirements-content {
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.mission-requirements-text {
+    color: #cbd5e1;
+    margin: 0;
+    line-height: 1.6;
+    font-family: 'Quantico', sans-serif;
+    font-size: 0.95rem;
+}
+
+/* Mission Details Container */
+.mission-details {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.mission-title {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    color: #ffffff;
+    text-shadow: 0 0 15px rgba(255, 0, 0, 0.6);
+    position: relative;
+    display: inline-block;
+}
+
+.mission-description {
+    color: #e2e8f0;
+    margin-bottom: 20px;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+/* Mission footer with info and action buttons */
+.mission-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(139, 0, 0, 0.3);
+}
+
+.mission-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mission-reward {
+    font-family: 'Marine', 'Saira Stencil One', sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: #d1d5db;
+}
+
+.mission-reward-value {
+    color: #ffc107;
+    text-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+.mission-duration {
+    font-family: 'Quantico', sans-serif;
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.mission-actions {
+    display: flex;
+    gap: 15px;
+}
+
+/* Mission Completion Animation Styles */
+.mission-completed-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 99999 !important;
+    pointer-events: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+.mission-completed-overlay {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    transition: opacity 0.5s ease !important;
+}
+
+.mission-completed-text, .mission-xp-text {
+    position: absolute !important;
+    text-align: center !important;
+    font-family: 'Marine', 'Saira Stencil One', sans-serif !important;
+    color: white !important;
+    text-shadow: 0 0 30px rgba(255, 0, 0, 0.8) !important;
+    transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    z-index: 10 !important;
+}
+
+.firework-launch {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 3px !important;
+    height: 10px !important;
+    background: linear-gradient(90deg, #dc2626, #991b1b) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.8) !important;
+    z-index: 5 !important;
+    pointer-events: none !important;
+}
+
+.firework-particle {
+    position: absolute !important;
+    width: 2px !important;
+    height: 2px !important;
+    background: linear-gradient(90deg, #dc2626, #991b1b) !important;
+    border-radius: 50% !important;
+    pointer-events: none !important;
+    z-index: 5 !important;
+}
+
+/* Animations */
+@keyframes missionPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes missionIconBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+@keyframes missionIconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes textUnderline {
+    0%, 100% { transform: scaleX(0); }
+    50% { transform: scaleX(1); }
+}
+
+@keyframes alertBarShine {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes headerShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+@keyframes missionBtnShine {
+    0% { left: -100%; }
+    20%, 100% { left: 100%; }
+}
+
+@keyframes vignetteBreathing {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0.4; }
+}
+
+@keyframes particleFloat {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    10% { opacity: 0.3; }
+    90% { opacity: 0.1; }
+    100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+}
+
+/* Random glitch effect - applied via JavaScript */
+@keyframes glitchEffect {
+    0%, 100% { opacity: 0; }
+    0.5%, 2% { opacity: 0.3; transform: translate(10px, 0); }
+    5%, 7% { opacity: 0; transform: translate(0, 0); }
+    10%, 12% { opacity: 0.2; transform: translate(-10px, 5px); }
+    15% { opacity: 0; }
+}
+
+/* Random scanline glitch - applied via JavaScript */
+@keyframes scanlineGlitch {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+/* Move the main menu down when mission is active */
+body.mission-active .nav-menu {
+    margin-top: 38px; /* Height of mission alert bar */
+    transition: margin-top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Ensure normal position when no mission is active */
+.nav-menu {
+    margin-top: 0;
+    transition: margin-top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Override menu glowing effect with mission red theme when a mission is active */
+body.mission-active .nav-menu::before {
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(139, 0, 0, 0.5), 
+        rgba(255, 0, 0, 0.8), 
+        rgba(139, 0, 0, 0.5),
+        transparent);
+    animation: missionMenuGlow 3s infinite;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+}
+
+/* Override hover effects with mission theme */
+body.mission-active .menu-link:hover .nav-item:not([style*="background: linear-gradient"]) {
+    box-shadow: 
+        0 15px 25px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(139, 0, 0, 0.4);
+}
+
+body.mission-active .nav-item.active:not([style*="background: linear-gradient"]) {
+    box-shadow: 
+        0 10px 25px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(139, 0, 0, 0.4);
+}
+
+body.mission-active .menu-link:hover .nav-item:not([style*="background: linear-gradient"]) span {
+    color: #ff6b6b;
+    text-shadow: 0 0 15px rgba(139, 0, 0, 0.6);
+}
+
+body.mission-active .nav-item.active:not([style*="background: linear-gradient"]) span {
+    color: #ff6b6b;
+    text-shadow: 0 0 15px rgba(139, 0, 0, 0.6);
+}
+
+@keyframes missionMenuGlow {
+    0%, 100% {
+        opacity: 0.5;
+        box-shadow: 0 0 10px rgba(139, 0, 0, 0.3);
+    }
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 20px rgba(139, 0, 0, 0.7);
+    }
+}
+
+/* Mobile responsive adjustments for mission alert and menu */
+@media (max-width: 768px) {
+    /* Adjust mission alert for tablets */
+    .mission-alert {
+        padding: 8px 0;
+    }
+    
+    .mission-alert-text {
+        font-size: 14px;
+        letter-spacing: 3px;
+    }
+    
+    .mission-alert-icon {
+        font-size: 16px;
+    }
+    
+    /* Adjust menu margin for tablets */
+    body.mission-active .nav-menu {
+        margin-top: 34px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Make mission alert more compact on phones */
+    .mission-alert {
+        padding: 6px 0;
+    }
+    
+    .mission-alert-content {
+        gap: 8px;
+    }
+    
+    .mission-alert-text {
+        font-size: 12px;
+        letter-spacing: 2px;
+    }
+    
+    .mission-alert-icon {
+        font-size: 14px;
+    }
+    
+    /* Special adjustment for vertical menu on phones */
+    body.mission-active .nav-menu {
+        margin-top: 30px;
+    }
+    
+    /* Hide decorative elements to save space */
+    .mission-alert-content::before,
+    .mission-alert-content::after {
+        display: none;
+    }
+    
+    /* Simplify text underline animation */
+    .mission-alert-text::after {
+        animation: none;
+        transform: scaleX(1);
+        height: 1px;
+    }
+} 
