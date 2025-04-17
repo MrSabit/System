@@ -1,14 +1,19 @@
-from app import create_app, db
-from app.models import User, Objective, ProgressRecord
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
 
-app = create_app()
+db = SQLAlchemy()
+login_manager = LoginManager()
 
-@app.cli.command('db')
-def init_db():
-    """Create and initialize the database."""
-    db.drop_all()
-    db.create_all()
-    print('Database initialized!')
-
-if __name__ == '__main__':
-    app.run()
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object('config.Config')
+    
+    db.init_app(app)
+    login_manager.init_app(app)
+    
+    # Import and register blueprints here
+    from app.routes import main_bp
+    app.register_blueprint(main_bp)
+    
+    return app
